@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Delta Neutral Monitor</title>
+    <style>
+      :root {
+        --bg: #f4f6ef;
+        --card: #ffffff;
+        --text: #1e2a1d;
+        --muted: #4d5c4b;
+        --ok: #1f8f3a;
+        --warn: #a66c00;
+        --bad: #b42318;
+      }
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top right, #e9f4d4 0, var(--bg) 45%);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--card);
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 2px 10px rgba(30, 42, 29, 0.08);
+      }
+      .k {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .v {
+        font-size: 24px;
+        font-weight: 700;
+      }
+      .row { margin-top: 16px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--card);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      th, td {
+        text-align: left;
+        padding: 10px;
+        font-size: 13px;
+        border-bottom: 1px solid #edf1e7;
+      }
+      .risk-low { color: var(--ok); }
+      .risk-medium, .risk-high { color: var(--warn); }
+      .risk-critical { color: var(--bad); }
+      .pill {
+        font-size: 12px;
+        border-radius: 999px;
+        padding: 3px 9px;
+        background: #eef4e8;
+      }
+      .fail { color: var(--bad); }
+      .ok { color: var(--ok); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Delta Neutral Monitor</h1>
+      <div class="grid" id="summary"></div>
+
+      <div class="row card">
+        <h3>Warnings</h3>
+        <ul id="warnings"></ul>
+      </div>
+
+      <div class="row card">
+        <h3>Connector Status</h3>
+        <div id="connectors"></div>
+      </div>
+
+      <div class="row">
+        <h3>Open Positions</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Exchange</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Size</th>
+              <th>Entry</th>
+              <th>Mark</th>
+              <th>Liq</th>
+              <th>Delta USD</th>
+              <th>PnL USD</th>
+            </tr>
+          </thead>
+          <tbody id="positions"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      function money(v) { return Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+
+      async function load() {
+        const res = await fetch('/v1/status');
+        const data = await res.json();
+
+        const riskClass = `risk-${data.risk.risk_level}`;
+        document.getElementById('summary').innerHTML = `
+          <div class="card"><div class="k">Total Equity</div><div class="v">$${money(data.total_equity_usd)}</div></div>
+          <div class="card"><div class="k">Available Margin</div><div class="v">$${money(data.total_available_margin_usd)}</div></div>
+          <div class="card"><div class="k">Margin Ratio</div><div class="v">${money(data.risk.margin_ratio)}</div></div>
+          <div class="card"><div class="k">Net Delta</div><div class="v">$${money(data.risk.net_delta_usd)}</div></div>
+          <div class="card"><div class="k">Risk Level</div><div class="v ${riskClass}">${data.risk.risk_level.toUpperCase()}</div></div>
+        `;
+
+        const warnings = document.getElementById('warnings');
+        warnings.innerHTML = '';
+        if (data.risk.warnings.length === 0) {
+          warnings.innerHTML = '<li>none</li>';
+        } else {
+          for (const w of data.risk.warnings) {
+            const li = document.createElement('li');
+            li.textContent = w;
+            warnings.appendChild(li);
+          }
+        }
+
+        const connectors = document.getElementById('connectors');
+        connectors.innerHTML = data.connector_statuses
+          .map((c) => `<span class="pill ${c.ok ? 'ok' : 'fail'}">${c.exchange}: ${c.ok ? 'ok' : c.error}</span>`)
+          .join(' ');
+
+        const rows = [];
+        for (const acc of data.accounts) {
+          for (const p of acc.positions) {
+            rows.push(`
+              <tr>
+                <td>${acc.exchange}</td>
+                <td>${p.symbol}</td>
+                <td>${p.side}</td>
+                <td>${money(p.size)}</td>
+                <td>${money(p.entry_price)}</td>
+                <td>${money(p.mark_price)}</td>
+                <td>${p.liquidation_price ? money(p.liquidation_price) : '-'}</td>
+                <td>${money(p.delta_usd)}</td>
+                <td>${money(p.pnl_usd)}</td>
+              </tr>
+            `);
+          }
+        }
+        document.getElementById('positions').innerHTML = rows.join('');
+      }
+
+      load();
+      setInterval(load, 15000);
+    </script>
+  </body>
+</html>
