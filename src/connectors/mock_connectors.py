@@ -45,3 +45,10 @@ class OkxConnector(ExchangeConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         return make_mock_snapshot(self.exchange, price_shift=220)
+
+
+class KucoinConnector(ExchangeConnector):
+    exchange = "kucoin"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=140)

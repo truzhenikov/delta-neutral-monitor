@@ -1,0 +1,32 @@
+:root {
+  --bg: #08111f;
+  --panel: #0f1b2d;
+  --panel-alt: #13233a;
+  --border: #20314d;
+  --text: #e7eef8;
+  --muted: #93a4bf;
+  --green: #18c37e;
+  --yellow: #f5b942;
+  --red: #f25f5c;
+  --blue: #4da3ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(180deg, #08111f 0%, #0b1424 100%);
+  color: var(--text);
+  font-family: Inter, Arial, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+}

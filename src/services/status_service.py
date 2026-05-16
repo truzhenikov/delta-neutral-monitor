@@ -38,12 +38,21 @@ class StatusService:
                 )
                 for p in acc.positions
             ]
+            total_notional = sum(p.notional_usd for p in acc.positions)
+            total_pnl = sum(p.pnl_usd for p in acc.positions)
+            total_delta = sum(p.delta_usd for p in acc.positions)
+            load_ratio = (acc.maintenance_margin_usd / acc.equity_usd) if acc.equity_usd else 0.0
             account_out.append(
                 AccountOut(
                     exchange=acc.exchange,
                     equity_usd=acc.equity_usd,
                     available_margin_usd=acc.available_margin_usd,
                     maintenance_margin_usd=acc.maintenance_margin_usd,
+                    position_count=len(acc.positions),
+                    total_notional_usd=total_notional,
+                    total_pnl_usd=total_pnl,
+                    total_delta_usd=total_delta,
+                    load_ratio=load_ratio,
                     updated_at=acc.updated_at,
                     positions=positions,
                 )

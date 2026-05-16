@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.hermes/
+AQ*
+webapp/node_modules/
+webapp/.next/
+webapp/.vercel/

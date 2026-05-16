@@ -7,6 +7,7 @@ TG bot + backend API for monitoring balances, margin, delta-neutral positions an
 - Hyperliquid
 - Extended
 - OKX
+- KuCoin Futures
 
 ## Quick start
 
@@ -43,5 +44,5 @@ python -m src.bot.run
 - `USE_MOCK_DATA=true` uses internal mock snapshots for all exchanges.
 - `USE_MOCK_DATA=false` enables real connectors.
 - Optional `TELEGRAM_ALERT_CHAT_ID` enables automatic push alerts with cooldown.
-- Real connectors implemented now: Bitget, OKX, Hyperliquid.
+- Real connectors implemented now: Bitget, OKX, Hyperliquid, KuCoin Futures.
 - BingX, MEXC, Extended are scaffolded and will return "not configured" until their auth/parsing is added.

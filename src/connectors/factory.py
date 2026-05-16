@@ -6,6 +6,7 @@ from src.connectors.mock_connectors import (
     BitgetConnector,
     ExtendedConnector,
     HyperliquidConnector,
+    KucoinConnector,
     MexcConnector,
     OkxConnector,
 )
@@ -14,6 +15,7 @@ from src.connectors.real_connectors import (
     BitgetRealConnector,
     ExtendedRealConnector,
     HyperliquidRealConnector,
+    KucoinRealConnector,
     MexcRealConnector,
     OkxRealConnector,
 )
@@ -25,6 +27,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "hyperliquid": HyperliquidConnector,
     "extended": ExtendedConnector,
     "okx": OkxConnector,
+    "kucoin": KucoinConnector,
 }
 
 REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
@@ -34,6 +37,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "hyperliquid": HyperliquidRealConnector,
     "extended": ExtendedRealConnector,
     "okx": OkxRealConnector,
+    "kucoin": KucoinRealConnector,
 }
 
 

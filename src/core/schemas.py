@@ -25,6 +25,11 @@ class AccountOut(BaseModel):
     equity_usd: float
     available_margin_usd: float
     maintenance_margin_usd: float
+    position_count: int
+    total_notional_usd: float
+    total_pnl_usd: float
+    total_delta_usd: float
+    load_ratio: float = Field(ge=0)
     updated_at: datetime
     positions: list[PositionOut]
 

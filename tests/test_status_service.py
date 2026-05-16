@@ -1,0 +1,55 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from src.core.models import AccountSnapshot, ConnectorStatus, Position
+from src.core.risk import RiskEngine
+from src.services.status_service import StatusService
+
+
+def test_build_status_includes_exchange_level_aggregates() -> None:
+    updated_at = datetime(2026, 5, 16, tzinfo=timezone.utc)
+    account = AccountSnapshot(
+        exchange="bitget",
+        equity_usd=1000.0,
+        available_margin_usd=650.0,
+        maintenance_margin_usd=250.0,
+        updated_at=updated_at,
+        positions=[
+            Position(
+                exchange="bitget",
+                symbol="BTCUSDT",
+                side="long",
+                size=0.1,
+                entry_price=100000.0,
+                mark_price=105000.0,
+                leverage=5.0,
+                liquidation_price=90000.0,
+            ),
+            Position(
+                exchange="bitget",
+                symbol="ETHUSDT",
+                side="short",
+                size=2.0,
+                entry_price=2500.0,
+                mark_price=2400.0,
+                leverage=4.0,
+                liquidation_price=2900.0,
+            ),
+        ],
+    )
+    connector_status = ConnectorStatus(
+        exchange="bitget",
+        ok=True,
+        error=None,
+        updated_at=updated_at,
+    )
+    service = StatusService(RiskEngine(max_margin_ratio=0.75, min_liq_distance_pct=12.0, max_abs_net_delta_usd=500.0))
+
+    snapshot = service.build_status([account], [connector_status])
+
+    assert snapshot.accounts[0].position_count == 2
+    assert snapshot.accounts[0].total_pnl_usd == 700.0
+    assert snapshot.accounts[0].total_delta_usd == 5700.0
+    assert snapshot.accounts[0].total_notional_usd == 15300.0
+    assert snapshot.accounts[0].load_ratio == 0.25

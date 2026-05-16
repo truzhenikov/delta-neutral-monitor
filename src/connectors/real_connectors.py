@@ -239,6 +239,81 @@ class BitgetRealConnector(_BaseRealConnector):
 class BingxRealConnector(_BaseRealConnector):
     exchange = "bingx"
 
+    def _build_signed_params(self, params: dict[str, Any] | None = None) -> tuple[dict[str, Any], dict[str, str]]:
+        settings = get_settings()
+        if not (settings.bingx_api_key and settings.bingx_api_secret):
+            raise RealConnectorNotConfiguredError(
+                "bingx credentials are not configured (BINGX_API_KEY/SECRET)"
+            )
+
+        signed_params = {"recvWindow": 0, "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000)}
+        if params:
+            signed_params.update(params)
+        query = urlencode(sorted(signed_params.items()))
+        signature = hmac.new(
+            settings.bingx_api_secret.encode("utf-8"), query.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        signed_params["signature"] = signature
+        headers = {"X-BX-APIKEY": settings.bingx_api_key}
+        return signed_params, headers
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        balance_params, balance_headers = self._build_signed_params()
+        balance_payload = await self._get(
+            base_url=settings.bingx_api_base,
+            path="/openApi/swap/v2/user/balance",
+            params=balance_params,
+            headers=balance_headers,
+        )
+        if int(balance_payload.get("code", -1)) != 0:
+            raise RealConnectorRequestError(f"bingx balance error: {balance_payload}")
+
+        position_params, position_headers = self._build_signed_params()
+        position_payload = await self._get(
+            base_url=settings.bingx_api_base,
+            path="/openApi/swap/v2/user/positions",
+            params=position_params,
+            headers=position_headers,
+        )
+        if int(position_payload.get("code", -1)) != 0:
+            raise RealConnectorRequestError(f"bingx positions error: {position_payload}")
+
+        balance_data = (balance_payload.get("data") or {}).get("balance") or {}
+        raw_positions = position_payload.get("data") or []
+
+        positions: list[Position] = []
+        for row in raw_positions:
+            size = _safe_float(row.get("positionAmt"))
+            if size <= 0:
+                continue
+            side = "short" if str(row.get("positionSide", "")).upper() == "SHORT" else "long"
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("symbol", "UNKNOWN")),
+                    side=side,
+                    size=size,
+                    entry_price=_safe_float(row.get("avgPrice")),
+                    mark_price=_safe_float(row.get("markPrice")),
+                    leverage=_safe_float(row.get("leverage"), default=1.0),
+                    liquidation_price=_safe_liq_price(row.get("liquidationPrice")),
+                )
+            )
+
+        equity = _safe_float(balance_data.get("equity"))
+        available = _safe_float(balance_data.get("availableMargin"))
+        maintenance = _safe_float(balance_data.get("usedMargin"))
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available,
+            maintenance_margin_usd=maintenance,
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
 
 class MexcRealConnector(_BaseRealConnector):
     exchange = "mexc"
@@ -458,6 +533,132 @@ class OkxRealConnector(_BaseRealConnector):
             available = sum(_safe_float(item.get("availEq")) for item in details)
 
         maintenance = _safe_float(account_data.get("mmr"))
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available,
+            maintenance_margin_usd=maintenance,
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
+class KucoinRealConnector(_BaseRealConnector):
+    exchange = "kucoin"
+
+    def _sign(self, secret: str, payload: str) -> str:
+        return base64.b64encode(
+            hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
+        ).decode("utf-8")
+
+    def _build_kucoin_headers(
+        self,
+        api_key: str,
+        api_secret: str,
+        passphrase: str,
+        method: str,
+        path: str,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        timestamp_ms = str(int(datetime.now(timezone.utc).timestamp() * 1000))
+        query = urlencode(params or {})
+        endpoint = path + (f"?{query}" if query else "")
+        pre_hash = f"{timestamp_ms}{method.upper()}{endpoint}"
+        signed_passphrase = self._sign(api_secret, passphrase)
+        signature = self._sign(api_secret, pre_hash)
+        return {
+            "KC-API-KEY": api_key,
+            "KC-API-SIGN": signature,
+            "KC-API-TIMESTAMP": timestamp_ms,
+            "KC-API-PASSPHRASE": signed_passphrase,
+            "KC-API-KEY-VERSION": "2",
+            "Content-Type": "application/json",
+        }
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        if not (settings.kucoin_api_key and settings.kucoin_api_secret and settings.kucoin_api_passphrase):
+            raise RealConnectorNotConfiguredError(
+                "kucoin credentials are not configured (KUCOIN_API_KEY/SECRET/PASSPHRASE)"
+            )
+
+        account_params = {"currency": "USDT"}
+        account_path = "/api/v1/account-overview"
+        account_headers = self._build_kucoin_headers(
+            api_key=settings.kucoin_api_key,
+            api_secret=settings.kucoin_api_secret,
+            passphrase=settings.kucoin_api_passphrase,
+            method="GET",
+            path=account_path,
+            params=account_params,
+        )
+        account_payload = await self._get(
+            base_url=settings.kucoin_api_base,
+            path=account_path,
+            params=account_params,
+            headers=account_headers,
+        )
+        if str(account_payload.get("code")) != "200000":
+            raise RealConnectorRequestError(f"kucoin account error: {account_payload}")
+
+        positions_path = "/api/v1/positions"
+        positions_headers = self._build_kucoin_headers(
+            api_key=settings.kucoin_api_key,
+            api_secret=settings.kucoin_api_secret,
+            passphrase=settings.kucoin_api_passphrase,
+            method="GET",
+            path=positions_path,
+        )
+        positions_payload = await self._get(
+            base_url=settings.kucoin_api_base,
+            path=positions_path,
+            headers=positions_headers,
+        )
+        if str(positions_payload.get("code")) != "200000":
+            raise RealConnectorRequestError(f"kucoin positions error: {positions_payload}")
+
+        account_data = account_payload.get("data") or {}
+        raw_positions = positions_payload.get("data") or []
+
+        positions: list[Position] = []
+        for row in raw_positions:
+            qty_signed = _safe_float(row.get("currentQty"))
+            if qty_signed == 0:
+                continue
+
+            side = "long" if qty_signed > 0 else "short"
+            size = abs(qty_signed)
+            mark = _safe_float(row.get("markPrice"))
+            entry = _safe_float(row.get("avgEntryPrice"), default=mark)
+            leverage = _safe_float(row.get("realLeverage"), default=1.0)
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("symbol", "UNKNOWN")),
+                    side=side,
+                    size=size,
+                    entry_price=entry,
+                    mark_price=mark,
+                    leverage=leverage if leverage > 0 else 1.0,
+                    liquidation_price=_safe_liq_price(row.get("liquidationPrice")),
+                )
+            )
+
+        equity = _safe_float(account_data.get("accountEquity"))
+        if equity <= 0:
+            equity = _safe_float(account_data.get("marginBalance"))
+
+        available = _safe_float(account_data.get("availableBalance"))
+        if available <= 0:
+            available = _safe_float(account_data.get("availableFunds"))
+
+        maintenance = _safe_float(account_data.get("maintMarginReq"))
+        if maintenance <= 0:
+            maintenance = _safe_float(account_data.get("positionMargin")) + _safe_float(
+                account_data.get("orderMargin")
+            )
 
         return AccountSnapshot(
             exchange=self.exchange,
