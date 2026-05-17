@@ -246,7 +246,7 @@ class BingxRealConnector(_BaseRealConnector):
                 "bingx credentials are not configured (BINGX_API_KEY/SECRET)"
             )
 
-        signed_params = {"recvWindow": 0, "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000)}
+        signed_params = {"recvWindow": 5000, "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000)}
         if params:
             signed_params.update(params)
         query = urlencode(sorted(signed_params.items()))

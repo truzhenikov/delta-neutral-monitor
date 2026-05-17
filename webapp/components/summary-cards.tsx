@@ -7,13 +7,7 @@ export function SummaryCards({ data }: { data: StatusPayload }) {
   const failedExchanges = data.connector_statuses.filter((item) => !item.ok).length;
 
   return (
-    <section
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: 16,
-      }}
-    >
+    <section className="summary-grid">
       <SummaryCard label="All Exchanges Balance" value={formatMoney(data.total_equity_usd)} />
       <SummaryCard label="Available Margin" value={formatMoney(data.total_available_margin_usd)} />
       <SummaryCard label="Maintenance Margin" value={formatMoney(data.total_maintenance_margin_usd)} />

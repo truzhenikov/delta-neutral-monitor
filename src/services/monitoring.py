@@ -13,6 +13,16 @@ class MonitoringService:
     def __init__(self, connectors: list[ExchangeConnector]) -> None:
         self.connectors = connectors
 
+    async def _fetch_with_retry(self, connector: ExchangeConnector) -> AccountSnapshot:
+        try:
+            return await connector.fetch_account_snapshot()
+        except Exception as exc:
+            if "timestamp" not in str(exc).lower():
+                raise
+            exchange = getattr(connector, "exchange", connector.__class__.__name__)
+            logger.warning("connector_timestamp_retry exchange=%s error=%s", exchange, exc)
+            return await connector.fetch_account_snapshot()
+
     async def collect(self) -> list[AccountSnapshot]:
         accounts, _ = await self.collect_with_status()
         return accounts
@@ -21,7 +31,7 @@ class MonitoringService:
         if not self.connectors:
             return [], []
         results = await asyncio.gather(
-            *(c.fetch_account_snapshot() for c in self.connectors), return_exceptions=True
+            *(self._fetch_with_retry(c) for c in self.connectors), return_exceptions=True
         )
 
         accounts: list[AccountSnapshot] = []

@@ -15,48 +15,24 @@ export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
   const [open, setOpen] = useState(account.position_count > 0);
   const statusLabel = connectorStatus?.ok ? 'online' : connectorStatus?.error || 'unknown';
   const statusColor = connectorStatus?.ok ? 'var(--green)' : 'var(--red)';
+  const statusBackground = connectorStatus?.ok ? 'rgba(24, 195, 126, 0.12)' : 'rgba(242, 95, 92, 0.12)';
   const loadBarColor = loadColor(account.load_ratio);
 
   const updatedAt = useMemo(() => new Date(account.updated_at).toLocaleString(), [account.updated_at]);
 
   return (
-    <article
-      style={{
-        background: 'var(--panel)',
-        border: '1px solid var(--border)',
-        borderRadius: 18,
-        padding: 18,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' }}>
+    <article className="exchange-card">
+      <div className="exchange-header">
         <div>
-          <div style={{ fontSize: 22, fontWeight: 700, textTransform: 'capitalize' }}>{account.exchange}</div>
-          <div style={{ color: 'var(--muted)', fontSize: 13 }}>Updated {updatedAt}</div>
+          <h3 className="exchange-name">{account.exchange}</h3>
+          <div className="exchange-meta">Updated {updatedAt}</div>
         </div>
-        <div
-          style={{
-            border: `1px solid ${statusColor}`,
-            color: statusColor,
-            borderRadius: 999,
-            padding: '6px 10px',
-            fontSize: 12,
-            textTransform: 'uppercase',
-          }}
-        >
+        <div className="status-pill" style={{ border: `1px solid ${statusColor}`, color: statusColor, background: statusBackground }}>
           {statusLabel}
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-          gap: 12,
-        }}
-      >
+      <div className="exchange-metrics">
         <Metric label="Balance" value={formatMoney(account.equity_usd)} />
         <Metric label="Available" value={formatMoney(account.available_margin_usd)} />
         <Metric label="Maintenance" value={formatMoney(account.maintenance_margin_usd)} />
@@ -65,41 +41,38 @@ export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
         <Metric label="Delta" value={formatMoney(account.total_delta_usd)} tone={account.total_delta_usd >= 0 ? 'var(--green)' : 'var(--red)'} />
       </div>
 
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ color: 'var(--muted)', fontSize: 13 }}>Exchange Load</span>
-          <span style={{ fontWeight: 600, color: loadBarColor }}>{formatPercent(account.load_ratio)}</span>
+      <div className="exchange-footer">
+        <div className="load-cluster">
+          <div className="load-header">
+            <span className="section-subtle">Exchange Load</span>
+            <span style={{ fontWeight: 700, color: loadBarColor }}>{formatPercent(account.load_ratio)}</span>
+          </div>
+          <div className="load-track">
+            <div className="load-fill" style={{ width: `${Math.min(account.load_ratio * 100, 100)}%`, background: loadBarColor }} />
+          </div>
         </div>
-        <div style={{ height: 10, background: 'var(--panel-alt)', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(account.load_ratio * 100, 100)}%`, height: '100%', background: loadBarColor }} />
-        </div>
-      </div>
 
-      <div>
-        <button
-          onClick={() => setOpen((value) => !value)}
-          style={{
-            background: 'transparent',
-            color: 'var(--blue)',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-        >
+        <button onClick={() => setOpen((value) => !value)} className="positions-toggle">
           {open ? 'Hide positions' : 'Show positions'}
         </button>
-        {open ? <div style={{ marginTop: 12 }}><PositionsTable positions={account.positions} /></div> : null}
       </div>
+
+      {open ? (
+        <div className="positions-wrap">
+          <PositionsTable positions={account.positions} />
+        </div>
+      ) : null}
     </article>
   );
 }
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <div style={{ background: 'var(--panel-alt)', borderRadius: 12, padding: 12 }}>
-      <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontWeight: 700, color: tone || 'var(--text)' }}>{value}</div>
+    <div className="metric-card">
+      <div className="metric-label">{label}</div>
+      <div className="metric-value" style={{ color: tone || 'var(--text)' }}>
+        {value}
+      </div>
     </div>
   );
 }
