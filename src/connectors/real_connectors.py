@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import collections
 import hashlib
 import hmac
 import json
@@ -38,6 +39,87 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 def _safe_liq_price(value: Any) -> float | None:
     val = _safe_float(value, default=0.0)
     return val if val > 0 else None
+
+
+def _hyperliquid_build_spot_graph(
+    spot_meta: dict[str, Any], all_mids: dict[str, Any]
+) -> dict[int, list[tuple[int, float]]]:
+    graph: dict[int, list[tuple[int, float]]] = {}
+    for market in spot_meta.get("universe") or []:
+        pair_tokens = market.get("tokens") or []
+        if len(pair_tokens) != 2:
+            continue
+
+        pair_index = market.get("index")
+        if pair_index is None:
+            continue
+
+        mid = _safe_float(all_mids.get(f"@{pair_index}"), default=0.0)
+        if mid <= 0:
+            continue
+
+        base_token = _safe_float(pair_tokens[0], default=-1)
+        quote_token = _safe_float(pair_tokens[1], default=-1)
+        if base_token < 0 or quote_token < 0:
+            continue
+
+        base_token_int = int(base_token)
+        quote_token_int = int(quote_token)
+        graph.setdefault(base_token_int, []).append((quote_token_int, mid))
+        graph.setdefault(quote_token_int, []).append((base_token_int, 1.0 / mid))
+
+    return graph
+
+
+def _hyperliquid_find_token_usd_price(
+    token: int,
+    graph: dict[int, list[tuple[int, float]]],
+    usd_token: int = 0,
+) -> float | None:
+    if token == usd_token:
+        return 1.0
+
+    queue: collections.deque[tuple[int, float]] = collections.deque([(token, 1.0)])
+    seen = {token}
+    while queue:
+        current_token, current_value = queue.popleft()
+        for next_token, conversion_rate in graph.get(current_token, []):
+            if next_token in seen:
+                continue
+
+            next_value = current_value * conversion_rate
+            if next_token == usd_token:
+                return next_value
+
+            seen.add(next_token)
+            queue.append((next_token, next_value))
+
+    return None
+
+
+def _hyperliquid_spot_portfolio_value(
+    spot_state: dict[str, Any],
+    spot_meta: dict[str, Any],
+    all_mids: dict[str, Any],
+) -> float:
+    graph = _hyperliquid_build_spot_graph(spot_meta, all_mids)
+    total_value = 0.0
+    for balance in spot_state.get("balances") or []:
+        total = _safe_float(balance.get("total"))
+        if total <= 0:
+            continue
+
+        token = int(_safe_float(balance.get("token"), default=-1))
+        if token < 0:
+            continue
+
+        token_price = _hyperliquid_find_token_usd_price(token, graph)
+        if token_price is None:
+            token_price = _safe_float(balance.get("entryNtl"), default=0.0) / total if total > 0 else 0.0
+
+        total_value += total * token_price
+
+    return total_value
 
 
 class _BaseRealConnector(ExchangeConnector):
@@ -334,7 +416,7 @@ class HyperliquidRealConnector(_BaseRealConnector):
             )
 
         positions: list[Position] = []
-        equity = 0.0
+        perps_equity = 0.0
         available = 0.0
         maintenance_margin = 0.0
 
@@ -413,12 +495,35 @@ class HyperliquidRealConnector(_BaseRealConnector):
                 state_payload.get("crossMaintenanceMarginUsed"), default=dex_estimated_maintenance_margin
             )
 
-            equity += dex_equity
+            perps_equity += dex_equity
             maintenance_margin += dex_maintenance_margin
             if "withdrawable" in state_payload:
                 available += _safe_float(state_payload.get("withdrawable"))
             else:
                 available += max(dex_equity - dex_maintenance_margin, 0.0)
+
+        spot_state = await self._post(
+            base_url=settings.hyperliquid_api_base,
+            path="/info",
+            body={"type": "spotClearinghouseState", "user": user},
+            headers={"Content-Type": "application/json"},
+        )
+        spot_meta = await self._post(
+            base_url=settings.hyperliquid_api_base,
+            path="/info",
+            body={"type": "spotMeta"},
+            headers={"Content-Type": "application/json"},
+        )
+        all_mids = await self._post(
+            base_url=settings.hyperliquid_api_base,
+            path="/info",
+            body={"type": "allMids"},
+            headers={"Content-Type": "application/json"},
+        )
+
+        spot_portfolio_value = _hyperliquid_spot_portfolio_value(spot_state, spot_meta, all_mids)
+        equity = spot_portfolio_value if spot_portfolio_value > 0 else perps_equity
+
         return AccountSnapshot(
             exchange=self.exchange,
             equity_usd=equity,
