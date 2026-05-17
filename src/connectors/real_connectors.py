@@ -325,87 +325,105 @@ class HyperliquidRealConnector(_BaseRealConnector):
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
         user = settings.hyperliquid_user_address.strip()
+        dexes = [part.strip() for part in settings.hyperliquid_dex.split(",") if part.strip()]
+        if not dexes:
+            dexes = [""]
         if not user:
             raise RealConnectorNotConfiguredError(
                 "hyperliquid user address is not configured (HYPERLIQUID_USER_ADDRESS)"
             )
 
-        state_payload = await self._post(
-            base_url=settings.hyperliquid_api_base,
-            path="/info",
-            body={"type": "clearinghouseState", "user": user},
-            headers={"Content-Type": "application/json"},
-        )
-        meta_ctx_payload = await self._post(
-            base_url=settings.hyperliquid_api_base,
-            path="/info",
-            body={"type": "metaAndAssetCtxs"},
-            headers={"Content-Type": "application/json"},
-        )
-
-        universe = []
-        ctxs = []
-        if isinstance(meta_ctx_payload, list) and len(meta_ctx_payload) >= 2:
-            meta = meta_ctx_payload[0] or {}
-            universe = meta.get("universe") or []
-            ctxs = meta_ctx_payload[1] or []
-
-        coin_to_mark: dict[str, float] = {}
-        for idx, item in enumerate(universe):
-            if idx >= len(ctxs):
-                break
-            coin = str(item.get("name", ""))
-            if not coin:
-                continue
-            coin_to_mark[coin] = _safe_float(ctxs[idx].get("markPx"))
-
-        margin_summary = state_payload.get("marginSummary") or {}
-        equity = _safe_float(margin_summary.get("accountValue"))
-
-        raw_positions = state_payload.get("assetPositions") or []
         positions: list[Position] = []
-        estimated_maintenance = 0.0
+        equity = 0.0
+        available = 0.0
+        maintenance_margin = 0.0
 
-        for row in raw_positions:
-            position_data = row.get("position") or {}
-            coin = str(position_data.get("coin", ""))
-            size_signed = _safe_float(position_data.get("szi"))
-            if coin == "" or size_signed == 0:
-                continue
+        for dex in dexes:
+            state_body = {"type": "clearinghouseState", "user": user}
+            if dex:
+                state_body["dex"] = dex
 
-            side = "long" if size_signed > 0 else "short"
-            size = abs(size_signed)
-            mark_price = coin_to_mark.get(coin) or _safe_float(position_data.get("markPx"))
-            entry_price = _safe_float(position_data.get("entryPx"), default=mark_price)
-            leverage = _safe_float((position_data.get("leverage") or {}).get("value"), default=1.0)
-            liq_price = _safe_liq_price(position_data.get("liquidationPx"))
-
-            positions.append(
-                Position(
-                    exchange=self.exchange,
-                    symbol=f"{coin}-PERP",
-                    side=side,
-                    size=size,
-                    entry_price=entry_price,
-                    mark_price=mark_price,
-                    leverage=leverage if leverage > 0 else 1.0,
-                    liquidation_price=liq_price,
-                )
+            state_payload = await self._post(
+                base_url=settings.hyperliquid_api_base,
+                path="/info",
+                body=state_body,
+                headers={"Content-Type": "application/json"},
+            )
+            meta_body = {"type": "metaAndAssetCtxs"}
+            if dex:
+                meta_body["dex"] = dex
+            meta_ctx_payload = await self._post(
+                base_url=settings.hyperliquid_api_base,
+                path="/info",
+                body=meta_body,
+                headers={"Content-Type": "application/json"},
             )
 
-            pos_notional = abs(size_signed * mark_price)
-            lev = leverage if leverage > 0 else 1.0
-            estimated_maintenance += (pos_notional / lev) * 0.05
+            universe = []
+            ctxs = []
+            if isinstance(meta_ctx_payload, list) and len(meta_ctx_payload) >= 2:
+                meta = meta_ctx_payload[0] or {}
+                universe = meta.get("universe") or []
+                ctxs = meta_ctx_payload[1] or []
 
-        available = _safe_float(state_payload.get("withdrawable"))
-        if available <= 0:
-            available = max(equity - estimated_maintenance, 0.0)
+            coin_to_mark: dict[str, float] = {}
+            for idx, item in enumerate(universe):
+                if idx >= len(ctxs):
+                    break
+                coin = str(item.get("name", ""))
+                if not coin:
+                    continue
+                coin_to_mark[coin] = _safe_float(ctxs[idx].get("markPx"))
 
+            raw_positions = state_payload.get("assetPositions") or []
+            dex_estimated_maintenance_margin = 0.0
+            for row in raw_positions:
+                position_data = row.get("position") or {}
+                coin = str(position_data.get("coin", ""))
+                size_signed = _safe_float(position_data.get("szi"))
+                if coin == "" or size_signed == 0:
+                    continue
+
+                side = "long" if size_signed > 0 else "short"
+                size = abs(size_signed)
+                mark_price = coin_to_mark.get(coin) or _safe_float(position_data.get("markPx"))
+                entry_price = _safe_float(position_data.get("entryPx"), default=mark_price)
+                leverage = _safe_float((position_data.get("leverage") or {}).get("value"), default=1.0)
+                liq_price = _safe_liq_price(position_data.get("liquidationPx"))
+                pos_notional = abs(size_signed * mark_price)
+                effective_leverage = leverage if leverage > 0 else 1.0
+                dex_estimated_maintenance_margin += (pos_notional / effective_leverage) * 0.05
+
+                positions.append(
+                    Position(
+                        exchange=self.exchange,
+                        symbol=f"{coin}-PERP",
+                        side=side,
+                        size=size,
+                        entry_price=entry_price,
+                        mark_price=mark_price,
+                        leverage=leverage if leverage > 0 else 1.0,
+                        liquidation_price=liq_price,
+                    )
+                )
+
+            margin_summary = state_payload.get("marginSummary") or {}
+            dex_equity = _safe_float(margin_summary.get("accountValue"))
+            dex_maintenance_margin = _safe_float(
+                state_payload.get("crossMaintenanceMarginUsed"), default=dex_estimated_maintenance_margin
+            )
+
+            equity += dex_equity
+            maintenance_margin += dex_maintenance_margin
+            if "withdrawable" in state_payload:
+                available += _safe_float(state_payload.get("withdrawable"))
+            else:
+                available += max(dex_equity - dex_maintenance_margin, 0.0)
         return AccountSnapshot(
             exchange=self.exchange,
             equity_usd=equity,
             available_margin_usd=available,
-            maintenance_margin_usd=estimated_maintenance,
+            maintenance_margin_usd=maintenance_margin,
             positions=positions,
             updated_at=utc_now(),
         )

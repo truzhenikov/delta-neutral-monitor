@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     hyperliquid_api_base: str = Field(default="https://api.hyperliquid.xyz", alias="HYPERLIQUID_API_BASE")
     hyperliquid_user_address: str = Field(default="", alias="HYPERLIQUID_USER_ADDRESS")
+    hyperliquid_dex: str = Field(default="", alias="HYPERLIQUID_DEX")
     hyperliquid_private_key: str = Field(default="", alias="HYPERLIQUID_PRIVATE_KEY")
     hyperliquid_read_only: bool = Field(default=True, alias="HYPERLIQUID_READ_ONLY")
 
