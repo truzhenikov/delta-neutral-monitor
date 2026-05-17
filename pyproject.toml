@@ -15,3 +15,6 @@ dependencies = [
 
 [tool.uv]
 dev-dependencies = []
+
+[tool.vercel]
+entrypoint = "src.main:app"
