@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     hyperliquid_private_key: str = Field(default="", alias="HYPERLIQUID_PRIVATE_KEY")
     hyperliquid_read_only: bool = Field(default=True, alias="HYPERLIQUID_READ_ONLY")
 
+    extended_api_base: str = Field(default="https://api.starknet.extended.exchange", alias="EXTENDED_API_BASE")
     extended_api_key: str = Field(default="", alias="EXTENDED_API_KEY")
     extended_stark_key_public: str = Field(default="", alias="EXTENDED_STARK_KEY_PUBLIC")
     extended_stark_key_private: str = Field(default="", alias="EXTENDED_STARK_KEY_PRIVATE")

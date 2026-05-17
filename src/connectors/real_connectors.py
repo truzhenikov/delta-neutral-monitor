@@ -414,6 +414,80 @@ class HyperliquidRealConnector(_BaseRealConnector):
 class ExtendedRealConnector(_BaseRealConnector):
     exchange = "extended"
 
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        if not settings.extended_api_key:
+            raise RealConnectorNotConfiguredError(
+                "extended credentials are not configured (EXTENDED_API_KEY)"
+            )
+
+        headers = {"X-Api-Key": settings.extended_api_key}
+
+        account_payload = await self._get(
+            base_url=settings.extended_api_base,
+            path="/api/v1/user/account/info",
+            headers=headers,
+        )
+        if account_payload.get("status") != "OK":
+            raise RealConnectorRequestError(f"extended account error: {account_payload}")
+
+        balance_payload = await self._get(
+            base_url=settings.extended_api_base,
+            path="/api/v1/user/balance",
+            headers=headers,
+        )
+        if balance_payload.get("status") != "OK":
+            raise RealConnectorRequestError(f"extended balance error: {balance_payload}")
+
+        positions_payload = await self._get(
+            base_url=settings.extended_api_base,
+            path="/api/v1/user/positions",
+            headers=headers,
+        )
+        if positions_payload.get("status") != "OK":
+            raise RealConnectorRequestError(f"extended positions error: {positions_payload}")
+
+        account_data = account_payload.get("data") or {}
+        balance_data = balance_payload.get("data") or {}
+        raw_positions = positions_payload.get("data") or []
+
+        positions: list[Position] = []
+        for row in raw_positions:
+            size = _safe_float(row.get("size"))
+            if size <= 0:
+                continue
+
+            side = "short" if str(row.get("side", "")).upper() == "SHORT" else "long"
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("market", "UNKNOWN")),
+                    side=side,
+                    size=size,
+                    entry_price=_safe_float(row.get("openPrice")),
+                    mark_price=_safe_float(row.get("markPrice")),
+                    leverage=_safe_float(row.get("leverage"), default=1.0),
+                    liquidation_price=_safe_liq_price(row.get("liquidationPrice")),
+                )
+            )
+
+        equity = _safe_float(balance_data.get("equity"))
+        available = _safe_float(balance_data.get("availableForTrade"))
+        maintenance = equity * _safe_float(balance_data.get("marginRatio"))
+
+        # Keep account payload consumed/validated even though the current snapshot
+        # mapping is driven by balance + positions.
+        _ = account_data
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available,
+            maintenance_margin_usd=maintenance,
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
 
 class OkxRealConnector(_BaseRealConnector):
     exchange = "okx"
