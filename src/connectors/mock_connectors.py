@@ -52,3 +52,10 @@ class KucoinConnector(ExchangeConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         return make_mock_snapshot(self.exchange, price_shift=140)
+
+
+class AdenConnector(ExchangeConnector):
+    exchange = "aden"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=-90)

@@ -397,6 +397,96 @@ class BingxRealConnector(_BaseRealConnector):
         )
 
 
+class AdenRealConnector(_BaseRealConnector):
+    exchange = "aden"
+
+    def _build_signed_headers(
+        self,
+        api_key: str,
+        api_secret: str,
+        method: str,
+        path: str,
+        query_string: str = "",
+        body_raw: str = "",
+    ) -> dict[str, str]:
+        settings = get_settings()
+        timestamp = str(int(datetime.now(timezone.utc).timestamp()))
+        payload_hash = hashlib.sha512(body_raw.encode("utf-8")).hexdigest()
+        sign_string = "\n".join([method.upper(), f"{settings.aden_api_prefix}{path}", query_string, payload_hash, timestamp])
+        signature = hmac.new(api_secret.encode("utf-8"), sign_string.encode("utf-8"), hashlib.sha512).hexdigest()
+        return {
+            "KEY": api_key,
+            "Timestamp": timestamp,
+            "SIGN": signature,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        if not (settings.aden_api_key and settings.aden_api_secret):
+            raise RealConnectorNotConfiguredError("aden credentials are not configured (ADEN_API_KEY/SECRET)")
+
+        account_path = f"{settings.aden_api_prefix}/dex_futures/usdt/accounts"
+        account_headers = self._build_signed_headers(
+            api_key=settings.aden_api_key,
+            api_secret=settings.aden_api_secret,
+            method="GET",
+            path="/dex_futures/usdt/accounts",
+        )
+        account_payload = await self._get(
+            base_url=settings.aden_api_base,
+            path=account_path,
+            headers=account_headers,
+        )
+        if not isinstance(account_payload, dict) or not account_payload:
+            raise RealConnectorRequestError(f"aden account error: {account_payload}")
+
+        positions_path = f"{settings.aden_api_prefix}/dex_futures/usdt/positions"
+        positions_headers = self._build_signed_headers(
+            api_key=settings.aden_api_key,
+            api_secret=settings.aden_api_secret,
+            method="GET",
+            path="/dex_futures/usdt/positions",
+        )
+        positions_payload = await self._get(
+            base_url=settings.aden_api_base,
+            path=positions_path,
+            headers=positions_headers,
+        )
+        if not isinstance(positions_payload, list):
+            raise RealConnectorRequestError(f"aden positions error: {positions_payload}")
+
+        positions: list[Position] = []
+        for row in positions_payload:
+            size = _safe_float(row.get("size"))
+            if size == 0:
+                continue
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("contract") or row.get("symbol") or "UNKNOWN"),
+                    side="long" if size > 0 else "short",
+                    size=abs(size),
+                    entry_price=_safe_float(row.get("entry_price") or row.get("avg_entry_price")),
+                    mark_price=_safe_float(row.get("mark_price") or row.get("markPrice") or row.get("last_price")),
+                    leverage=_safe_float(row.get("leverage"), default=1.0),
+                    liquidation_price=_safe_liq_price(row.get("liq_price") or row.get("liquidation_price")),
+                )
+            )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=_safe_float(account_payload.get("total") or account_payload.get("total_margin_balance")),
+            available_margin_usd=_safe_float(account_payload.get("available") or account_payload.get("cross_available")),
+            maintenance_margin_usd=_safe_float(
+                account_payload.get("maintenance_margin") or account_payload.get("cross_maintenance_margin")
+            ),
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
 class MexcRealConnector(_BaseRealConnector):
     exchange = "mexc"
 

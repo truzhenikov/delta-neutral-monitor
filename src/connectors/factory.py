@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.connectors.base import ExchangeConnector
 from src.connectors.mock_connectors import (
+    AdenConnector,
     BingxConnector,
     BitgetConnector,
     ExtendedConnector,
@@ -11,6 +12,7 @@ from src.connectors.mock_connectors import (
     OkxConnector,
 )
 from src.connectors.real_connectors import (
+    AdenRealConnector,
     BingxRealConnector,
     BitgetRealConnector,
     ExtendedRealConnector,
@@ -21,6 +23,7 @@ from src.connectors.real_connectors import (
 )
 
 MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
+    "aden": AdenConnector,
     "bitget": BitgetConnector,
     "bingx": BingxConnector,
     "mexc": MexcConnector,
@@ -31,6 +34,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
 }
 
 REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
+    "aden": AdenRealConnector,
     "bitget": BitgetRealConnector,
     "bingx": BingxRealConnector,
     "mexc": MexcRealConnector,

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     alert_cooldown_sec: int = Field(default=300, alias="ALERT_COOLDOWN_SEC")
 
     enabled_exchanges: str = Field(
-        default="bitget,bingx,mexc,hyperliquid,extended,okx,kucoin", alias="ENABLED_EXCHANGES"
+        default="bitget,bingx,mexc,hyperliquid,extended,okx,kucoin,aden", alias="ENABLED_EXCHANGES"
     )
 
     bitget_api_base: str = Field(default="https://api.bitget.com", alias="BITGET_API_BASE")
@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     kucoin_api_key: str = Field(default="", alias="KUCOIN_API_KEY")
     kucoin_api_secret: str = Field(default="", alias="KUCOIN_API_SECRET")
     kucoin_api_passphrase: str = Field(default="", alias="KUCOIN_API_PASSPHRASE")
+
+    aden_api_base: str = Field(default="https://api.aden.io", alias="ADEN_API_BASE")
+    aden_api_prefix: str = Field(default="/api/v1", alias="ADEN_API_PREFIX")
+    aden_api_key: str = Field(default="", alias="ADEN_API_KEY")
+    aden_api_secret: str = Field(default="", alias="ADEN_API_SECRET")
 
     max_margin_ratio: float = Field(default=0.75, alias="MAX_MARGIN_RATIO")
     min_liq_distance_pct: float = Field(default=12.0, alias="MIN_LIQ_DISTANCE_PCT")
