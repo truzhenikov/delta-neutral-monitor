@@ -266,6 +266,65 @@ select {
   gap: 8px;
 }
 
+.compact-overview-card {
+  padding: 18px;
+}
+
+.compact-overview-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.compact-overview-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.compact-overview-table-wrap {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(46, 70, 111, 0.45);
+  background: rgba(10, 20, 34, 0.72);
+}
+
+.compact-overview-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.compact-overview-table thead tr {
+  background: rgba(19, 35, 58, 0.9);
+}
+
+.compact-overview-table th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 12px;
+}
+
+.compact-overview-table td {
+  padding: 14px 12px;
+  border-top: 1px solid rgba(46, 70, 111, 0.32);
+  font-size: 14px;
+}
+
+.compact-overview-table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.compact-overview-exchange {
+  text-transform: capitalize;
+  font-weight: 700;
+}
+
 .exchange-grid {
   margin-top: 20px;
   display: grid;

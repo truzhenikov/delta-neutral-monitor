@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 
+import { CompactExchangeOverview } from '@/components/compact-exchange-overview';
 import { ExchangeCard } from '@/components/exchange-card';
 import { SummaryCards } from '@/components/summary-cards';
 import { fetchStatus } from '@/lib/api';
@@ -144,6 +145,9 @@ export function DashboardShell() {
       {data ? (
         <>
           <SummaryCards data={data} />
+          <section style={{ marginTop: 20 }}>
+            <CompactExchangeOverview accounts={visibleAccounts} />
+          </section>
 
           <section style={{ marginTop: 20, display: 'grid', gap: 12 }}>
             <Panel warning>
