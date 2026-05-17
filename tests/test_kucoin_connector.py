@@ -14,6 +14,7 @@ class StubKucoinConnector(KucoinRealConnector):
         assert path in {
             "/api/v1/account-overview",
             "/api/v1/positions",
+            "/api/v1/contracts/active",
         }
         return self._responses.pop(0)
 
@@ -87,6 +88,13 @@ def test_kucoin_real_connector_maps_futures_account_snapshot(monkeypatch) -> Non
                 },
             ],
         },
+        {
+            "code": "200000",
+            "data": [
+                {"symbol": "XBTUSDTM", "multiplier": "0.001"},
+                {"symbol": "XAUTUSDTM", "multiplier": "0.01"},
+            ],
+        },
     ]
 
     snapshot = asyncio.run(connector.fetch_account_snapshot())
@@ -100,7 +108,7 @@ def test_kucoin_real_connector_maps_futures_account_snapshot(monkeypatch) -> Non
     btc = snapshot.positions[0]
     assert btc.symbol == "XBTUSDTM"
     assert btc.side == "long"
-    assert btc.size == 2.0
+    assert btc.size == 0.002
     assert btc.entry_price == 61000.0
     assert btc.mark_price == 62000.0
     assert btc.leverage == 5.0
@@ -109,7 +117,7 @@ def test_kucoin_real_connector_maps_futures_account_snapshot(monkeypatch) -> Non
     gold = snapshot.positions[1]
     assert gold.symbol == "XAUTUSDTM"
     assert gold.side == "short"
-    assert gold.size == 3.0
+    assert gold.size == 0.03
     assert gold.mark_price == 2380.0
     assert gold.leverage == 4.0
 

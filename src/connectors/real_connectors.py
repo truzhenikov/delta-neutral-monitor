@@ -618,8 +618,22 @@ class KucoinRealConnector(_BaseRealConnector):
         if str(positions_payload.get("code")) != "200000":
             raise RealConnectorRequestError(f"kucoin positions error: {positions_payload}")
 
+        contracts_path = "/api/v1/contracts/active"
+        contracts_payload = await self._get(
+            base_url=settings.kucoin_api_base,
+            path=contracts_path,
+        )
+        if str(contracts_payload.get("code")) != "200000":
+            raise RealConnectorRequestError(f"kucoin contracts error: {contracts_payload}")
+
         account_data = account_payload.get("data") or {}
         raw_positions = positions_payload.get("data") or []
+        contracts = contracts_payload.get("data") or []
+        symbol_to_multiplier = {
+            str(row.get("symbol", "")): _safe_float(row.get("multiplier"), default=1.0)
+            for row in contracts
+            if str(row.get("symbol", ""))
+        }
 
         positions: list[Position] = []
         for row in raw_positions:
@@ -627,8 +641,10 @@ class KucoinRealConnector(_BaseRealConnector):
             if qty_signed == 0:
                 continue
 
+            symbol = str(row.get("symbol", "UNKNOWN"))
+            multiplier = symbol_to_multiplier.get(symbol, 1.0)
             side = "long" if qty_signed > 0 else "short"
-            size = abs(qty_signed)
+            size = abs(qty_signed) * multiplier
             mark = _safe_float(row.get("markPrice"))
             entry = _safe_float(row.get("avgEntryPrice"), default=mark)
             leverage = _safe_float(row.get("realLeverage"), default=1.0)
@@ -636,7 +652,7 @@ class KucoinRealConnector(_BaseRealConnector):
             positions.append(
                 Position(
                     exchange=self.exchange,
-                    symbol=str(row.get("symbol", "UNKNOWN")),
+                    symbol=symbol,
                     side=side,
                     size=size,
                     entry_price=entry,
