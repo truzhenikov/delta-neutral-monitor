@@ -5,6 +5,7 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { ExchangeCard } from '@/components/exchange-card';
 import { SummaryCards } from '@/components/summary-cards';
 import { fetchStatus } from '@/lib/api';
+import { DEFAULT_REFRESH_INTERVAL_MS, formatRefreshIntervalLabel, REFRESH_INTERVAL_OPTIONS, type RefreshIntervalMs } from '@/lib/refresh-interval';
 import { StatusPayload } from '@/lib/types';
 
 type FilterMode = 'all' | 'with-positions' | 'errors';
@@ -17,6 +18,7 @@ export function DashboardShell() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterMode>('all');
   const [sort, setSort] = useState<SortMode>('balance');
+  const [refreshIntervalMs, setRefreshIntervalMs] = useState<RefreshIntervalMs>(DEFAULT_REFRESH_INTERVAL_MS);
 
   async function load() {
     try {
@@ -33,9 +35,14 @@ export function DashboardShell() {
 
   useEffect(() => {
     void load();
-    const interval = setInterval(() => void load(), 15000);
+
+    if (refreshIntervalMs === 0) {
+      return;
+    }
+
+    const interval = setInterval(() => void load(), refreshIntervalMs);
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshIntervalMs]);
 
   const connectorHealth = useMemo(() => {
     if (!data) return { ok: 0, total: 0 };
@@ -76,7 +83,7 @@ export function DashboardShell() {
 
           <div className="hero-badges">
             <div className="hero-badge">
-              Refresh cadence: <strong>15 sec</strong>
+              Refresh cadence: <strong>{formatRefreshIntervalLabel(refreshIntervalMs)}</strong>
             </div>
             <div className="hero-badge">
               Connectors online: <strong>{connectorHealth.ok}/{connectorHealth.total || '—'}</strong>
@@ -107,12 +114,26 @@ export function DashboardShell() {
                   <option value="pnl">By PnL</option>
                 </select>
               </label>
+              <label className="control-label">
+                <span>Auto refresh</span>
+                <select
+                  value={refreshIntervalMs}
+                  onChange={(e) => setRefreshIntervalMs(Number(e.target.value) as RefreshIntervalMs)}
+                  className="dashboard-select"
+                >
+                  {REFRESH_INTERVAL_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {formatRefreshIntervalLabel(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
 
           <div style={{ display: 'grid', gap: 12 }}>
             <button onClick={() => void load()} className="dashboard-button">Refresh now</button>
-            <div className="control-caption">Use filters to isolate stressed exchanges, then sort by balance, load, or current PnL to scan risk faster.</div>
+            <div className="control-caption">Use filters to isolate stressed exchanges, tune auto-refresh to your pace, then sort by balance, load, or current PnL to scan risk faster.</div>
           </div>
         </div>
       </section>

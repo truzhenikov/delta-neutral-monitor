@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "tsx --test lib/*.test.ts"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -17,6 +18,7 @@
     "@types/node": "22.15.30",
     "@types/react": "19.0.10",
     "@types/react-dom": "19.0.4",
+    "tsx": "^4.22.1",
     "typescript": "5.8.3"
   }
 }

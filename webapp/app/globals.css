@@ -125,7 +125,7 @@ select {
 
 .control-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
 }
 
@@ -322,6 +322,95 @@ select {
 .metric-value {
   font-weight: 800;
   font-size: 18px;
+}
+
+.exchange-layers {
+  display: grid;
+  gap: 14px;
+}
+
+.liquidity-card {
+  background: linear-gradient(180deg, rgba(19, 35, 58, 0.84), rgba(13, 24, 41, 0.92));
+  border: 1px solid rgba(46, 70, 111, 0.48);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.liquidity-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.liquidity-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-strong);
+  margin-bottom: 6px;
+}
+
+.liquidity-pill {
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.liquidity-pill-healthy {
+  color: var(--green);
+  background: rgba(24, 195, 126, 0.12);
+  border: 1px solid rgba(24, 195, 126, 0.28);
+}
+
+.liquidity-pill-watch {
+  color: var(--blue-strong);
+  background: rgba(77, 163, 255, 0.12);
+  border: 1px solid rgba(77, 163, 255, 0.24);
+}
+
+.liquidity-pill-tight {
+  color: var(--yellow);
+  background: rgba(245, 185, 66, 0.12);
+  border: 1px solid rgba(245, 185, 66, 0.24);
+}
+
+.liquidity-pill-critical {
+  color: var(--red);
+  background: rgba(242, 95, 92, 0.12);
+  border: 1px solid rgba(242, 95, 92, 0.24);
+}
+
+.liquidity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.liquidity-metric {
+  border-radius: 14px;
+  padding: 12px 13px;
+  background: rgba(7, 17, 31, 0.42);
+  border: 1px solid rgba(46, 70, 111, 0.36);
+}
+
+.liquidity-metric-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.liquidity-metric-value {
+  font-size: 17px;
+  font-weight: 800;
 }
 
 .exchange-footer {
