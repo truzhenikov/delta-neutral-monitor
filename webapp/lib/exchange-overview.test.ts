@@ -1,7 +1,7 @@
 import test from 'node:test';
 import * as assert from 'node:assert/strict';
 
-import { buildExchangeOverviewRows } from './exchange-overview';
+import { buildExchangeOverviewRows, buildExchangeOverviewTotals } from './exchange-overview';
 import type { Account } from './types';
 
 const accounts: Account[] = [
@@ -83,4 +83,13 @@ test('buildExchangeOverviewRows flags stressed exchanges when notional exists bu
 
   assert.equal(stress?.positionNotionalUsd, 1200);
   assert.equal(stress?.realLeverage, null);
+});
+
+test('buildExchangeOverviewTotals aggregates balance and position volume across all exchanges and computes portfolio leverage', () => {
+  const totals = buildExchangeOverviewTotals(accounts);
+
+  assert.equal(totals.label, 'Total');
+  assert.ok(Math.abs(totals.balanceUsd - 5464.708986666951) < 1e-12);
+  assert.ok(Math.abs(totals.positionNotionalUsd - 41567.715000000004) < 1e-12);
+  assert.ok(Math.abs((totals.realLeverage ?? 0) - 7.6065743119018485) < 1e-12);
 });

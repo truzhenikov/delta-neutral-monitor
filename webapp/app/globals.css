@@ -325,6 +325,15 @@ select {
   font-weight: 700;
 }
 
+.compact-overview-total-row {
+  background: rgba(51, 181, 255, 0.08) !important;
+}
+
+.compact-overview-total-row td {
+  font-weight: 700;
+  border-top-color: rgba(51, 181, 255, 0.28);
+}
+
 .exchange-grid {
   margin-top: 20px;
   display: grid;

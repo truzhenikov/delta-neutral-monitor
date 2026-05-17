@@ -1,9 +1,10 @@
 import { formatMoney, formatNumber } from '@/lib/format';
-import { buildExchangeOverviewRows } from '@/lib/exchange-overview';
+import { buildExchangeOverviewRows, buildExchangeOverviewTotals } from '@/lib/exchange-overview';
 import type { Account } from '@/lib/types';
 
 export function CompactExchangeOverview({ accounts }: { accounts: Account[] }) {
   const rows = buildExchangeOverviewRows(accounts);
+  const totals = buildExchangeOverviewTotals(accounts);
 
   return (
     <section className="surface-card compact-overview-card">
@@ -33,6 +34,12 @@ export function CompactExchangeOverview({ accounts }: { accounts: Account[] }) {
                 <td>{row.realLeverage === null ? 'Stress' : `${formatNumber(row.realLeverage)}x`}</td>
               </tr>
             ))}
+            <tr className="compact-overview-total-row">
+              <td className="compact-overview-exchange">{totals.label}</td>
+              <td>{formatMoney(totals.balanceUsd)}</td>
+              <td>{formatMoney(totals.positionNotionalUsd)}</td>
+              <td>{totals.realLeverage === null ? 'Stress' : `${formatNumber(totals.realLeverage)}x`}</td>
+            </tr>
           </tbody>
         </table>
       </div>
