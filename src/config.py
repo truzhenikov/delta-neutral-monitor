@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     max_margin_ratio: float = Field(default=0.75, alias="MAX_MARGIN_RATIO")
     min_liq_distance_pct: float = Field(default=12.0, alias="MIN_LIQ_DISTANCE_PCT")
     max_abs_net_delta_usd: float = Field(default=500.0, alias="MAX_ABS_NET_DELTA_USD")
+    history_storage_dir: str = Field(default="data/portfolio-history", alias="HISTORY_STORAGE_DIR")
+    history_snapshot_interval_hours: int = Field(default=4, alias="HISTORY_SNAPSHOT_INTERVAL_HOURS")
+    history_retention_days: int = Field(default=30, alias="HISTORY_RETENTION_DAYS")
 
     @property
     def exchanges(self) -> list[str]:

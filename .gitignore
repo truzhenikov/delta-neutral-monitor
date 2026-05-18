@@ -9,3 +9,4 @@ webapp/node_modules/
 webapp/.next/
 webapp/.vercel/
 .vercel
+data/portfolio-history/

@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-from src.deps import get_monitoring_service, get_status_service
+from src.deps import get_history_service, get_monitoring_service, get_status_service
 
 router = APIRouter()
 
@@ -22,6 +22,12 @@ async def status() -> dict:
     accounts, connector_statuses = await monitoring.collect_with_status()
     snapshot = status_service.build_status(accounts, connector_statuses=connector_statuses)
     return snapshot.model_dump()
+
+
+@router.get("/v1/history")
+async def history() -> dict:
+    history_service = get_history_service()
+    return history_service.build_history_response().model_dump()
 
 
 @router.get("/dashboard", response_class=HTMLResponse)

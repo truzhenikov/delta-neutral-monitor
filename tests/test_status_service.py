@@ -53,3 +53,28 @@ def test_build_status_includes_exchange_level_aggregates() -> None:
     assert snapshot.accounts[0].total_delta_usd == 5700.0
     assert snapshot.accounts[0].total_notional_usd == 15300.0
     assert snapshot.accounts[0].load_ratio == 0.25
+
+
+def test_build_status_includes_embedded_history_snapshot() -> None:
+    updated_at = datetime(2026, 5, 18, 0, 0, tzinfo=timezone.utc)
+    account = AccountSnapshot(
+        exchange="bitget",
+        equity_usd=1000.0,
+        available_margin_usd=600.0,
+        maintenance_margin_usd=120.0,
+        updated_at=updated_at,
+        positions=[],
+    )
+    connector_status = ConnectorStatus(
+        exchange="bitget",
+        ok=True,
+        error=None,
+        updated_at=updated_at,
+    )
+    service = StatusService(RiskEngine(max_margin_ratio=0.75, min_liq_distance_pct=12.0, max_abs_net_delta_usd=500.0))
+
+    status = service.build_status([account], [connector_status])
+
+    assert status.current_snapshot.total_equity_usd == 1000.0
+    assert status.current_snapshot.warning_count == len(status.risk.warnings)
+    assert status.current_snapshot.warnings == status.risk.warnings

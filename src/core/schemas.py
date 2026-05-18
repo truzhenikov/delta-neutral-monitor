@@ -50,6 +50,35 @@ class ConnectorStatusOut(BaseModel):
     updated_at: datetime
 
 
+class PortfolioHistorySnapshotOut(BaseModel):
+    recorded_at: datetime
+    total_equity_usd: float
+    total_available_margin_usd: float
+    total_maintenance_margin_usd: float
+    warning_count: int = Field(ge=0)
+    warnings: list[str]
+
+
+class HistoryChartPointOut(BaseModel):
+    label: str
+    equity_usd: float
+    recorded_at: datetime
+
+
+class PortfolioHistorySummaryOut(BaseModel):
+    date: str
+    equity_usd: float
+    change_usd: Optional[float]
+    warning_count: int = Field(ge=0)
+    warnings: list[str]
+
+
+class PortfolioHistoryOut(BaseModel):
+    snapshots: list[PortfolioHistorySnapshotOut]
+    chart: list[HistoryChartPointOut]
+    daily_changes: list[PortfolioHistorySummaryOut]
+
+
 class StatusOut(BaseModel):
     total_equity_usd: float
     total_available_margin_usd: float
@@ -57,3 +86,4 @@ class StatusOut(BaseModel):
     accounts: list[AccountOut]
     connector_statuses: list[ConnectorStatusOut]
     risk: RiskOut
+    current_snapshot: PortfolioHistorySnapshotOut

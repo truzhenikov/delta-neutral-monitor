@@ -1,0 +1,13 @@
+[Unit]
+Description=Capture Delta Neutral Monitor portfolio history snapshot
+After=network-online.target delta-neutral-monitor-backend.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/projects/delta-neutral-monitor
+Environment=APP_ENV=prod
+Environment=USE_MOCK_DATA=false
+Environment=ENABLED_EXCHANGES=bitget,bingx,hyperliquid,extended,okx,kucoin,aden
+Environment=REQUEST_TIMEOUT_SEC=20
+ExecStart=/usr/local/lib/hermes-agent/venv/bin/python3 -m src.scripts.capture_history_snapshot

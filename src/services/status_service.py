@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from src.core.models import AccountSnapshot, ConnectorStatus
 from src.core.risk import RiskEngine
-from src.core.schemas import AccountOut, ConnectorStatusOut, PositionOut, RiskOut, StatusOut
+from src.core.schemas import (
+    AccountOut,
+    ConnectorStatusOut,
+    PortfolioHistorySnapshotOut,
+    PositionOut,
+    RiskOut,
+    StatusOut,
+)
+from src.services.history_service import HistoryService
 
 
 class StatusService:
-    def __init__(self, risk_engine: RiskEngine) -> None:
+    def __init__(self, risk_engine: RiskEngine, history_service: HistoryService | None = None) -> None:
         self.risk_engine = risk_engine
+        self.history_service = history_service
 
     def build_status(
         self,
@@ -68,6 +77,16 @@ class StatusService:
             for s in (connector_statuses or [])
         ]
 
+        current_snapshot = self._build_current_snapshot(
+            total_equity=total_equity,
+            total_available=total_available,
+            total_maintenance=total_maintenance,
+            warnings=risk.warnings,
+            generated_at=risk.generated_at,
+        )
+        if self.history_service is not None:
+            current_snapshot = self.history_service.record(current_snapshot)
+
         return StatusOut(
             total_equity_usd=total_equity,
             total_available_margin_usd=total_available,
@@ -82,4 +101,23 @@ class StatusService:
                 warnings=risk.warnings,
                 generated_at=risk.generated_at,
             ),
+            current_snapshot=current_snapshot,
+        )
+
+    def _build_current_snapshot(
+        self,
+        *,
+        total_equity: float,
+        total_available: float,
+        total_maintenance: float,
+        warnings: list[str],
+        generated_at,
+    ) -> PortfolioHistorySnapshotOut:
+        return PortfolioHistorySnapshotOut(
+            recorded_at=generated_at,
+            total_equity_usd=total_equity,
+            total_available_margin_usd=total_available,
+            total_maintenance_margin_usd=total_maintenance,
+            warning_count=len(warnings),
+            warnings=warnings,
         )
