@@ -130,3 +130,45 @@ def test_aden_real_connector_maps_account_snapshot(monkeypatch) -> None:
     assert eth.liquidation_price == 2850.0
 
     get_settings.cache_clear()
+
+
+def test_aden_real_connector_normalizes_contract_size_using_value_field(monkeypatch) -> None:
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("ADEN_API_KEY", "key")
+    monkeypatch.setenv("ADEN_API_SECRET", "secret")
+
+    connector = StubAdenConnector()
+    connector._responses = [
+        {
+            "total": "2918.109677131344",
+            "available": "2495.321527131344",
+            "maintenance_margin": "41.14885",
+        },
+        [
+            {
+                "contract": "COINX_USDT",
+                "size": 2000,
+                "value": "3827.8",
+                "entry_price": "193.246865",
+                "mark_price": "191.39",
+                "leverage": "0",
+                "lever": "10",
+                "liq_price": "47.86",
+            }
+        ],
+    ]
+
+    snapshot = asyncio.run(connector.fetch_account_snapshot())
+
+    assert len(snapshot.positions) == 1
+    position = snapshot.positions[0]
+    assert position.symbol == "COINX_USDT"
+    assert position.side == "long"
+    assert round(position.size, 8) == 20.0
+    assert position.notional_usd == 3827.8
+    assert round(position.pnl_usd, 4) == -37.1373
+    assert position.leverage == 10.0
+
+    get_settings.cache_clear()

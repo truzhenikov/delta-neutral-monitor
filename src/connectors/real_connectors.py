@@ -459,18 +459,29 @@ class AdenRealConnector(_BaseRealConnector):
 
         positions: list[Position] = []
         for row in positions_payload:
-            size = _safe_float(row.get("size"))
-            if size == 0:
+            size_signed = _safe_float(row.get("size"))
+            if size_signed == 0:
                 continue
+
+            mark_price = _safe_float(row.get("mark_price") or row.get("markPrice") or row.get("last_price"))
+            notional_value = _safe_float(row.get("value"))
+            normalized_size = abs(size_signed)
+            if notional_value > 0 and mark_price > 0:
+                normalized_size = notional_value / mark_price
+
+            leverage = _safe_float(row.get("leverage"), default=0.0)
+            if leverage <= 0:
+                leverage = _safe_float(row.get("lever"), default=1.0)
+
             positions.append(
                 Position(
                     exchange=self.exchange,
                     symbol=str(row.get("contract") or row.get("symbol") or "UNKNOWN"),
-                    side="long" if size > 0 else "short",
-                    size=abs(size),
+                    side="long" if size_signed > 0 else "short",
+                    size=normalized_size,
                     entry_price=_safe_float(row.get("entry_price") or row.get("avg_entry_price")),
-                    mark_price=_safe_float(row.get("mark_price") or row.get("markPrice") or row.get("last_price")),
-                    leverage=_safe_float(row.get("leverage"), default=1.0),
+                    mark_price=mark_price,
+                    leverage=leverage,
                     liquidation_price=_safe_liq_price(row.get("liq_price") or row.get("liquidation_price")),
                 )
             )
