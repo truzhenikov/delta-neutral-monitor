@@ -1,0 +1,81 @@
+{
+  "snapshots": [
+    {
+      "recorded_at": "2026-05-15T00:00:00Z",
+      "total_equity_usd": 166420,
+      "total_available_margin_usd": 74500,
+      "total_maintenance_margin_usd": 35100,
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "recorded_at": "2026-05-15T04:00:00Z",
+      "total_equity_usd": 167010,
+      "total_available_margin_usd": 74800,
+      "total_maintenance_margin_usd": 35250,
+      "warning_count": 0,
+      "warnings": []
+    },
+    {
+      "recorded_at": "2026-05-16T00:00:00Z",
+      "total_equity_usd": 171200,
+      "total_available_margin_usd": 76020,
+      "total_maintenance_margin_usd": 35940,
+      "warning_count": 1,
+      "warnings": ["Net delta 1280.00 USD exceeds threshold 500.00"]
+    },
+    {
+      "recorded_at": "2026-05-17T00:00:00Z",
+      "total_equity_usd": 174100,
+      "total_available_margin_usd": 76840,
+      "total_maintenance_margin_usd": 36220,
+      "warning_count": 1,
+      "warnings": ["Net delta 970.00 USD exceeds threshold 500.00"]
+    },
+    {
+      "recorded_at": "2026-05-18T00:00:00Z",
+      "total_equity_usd": 175955,
+      "total_available_margin_usd": 77000,
+      "total_maintenance_margin_usd": 36400,
+      "warning_count": 1,
+      "warnings": ["Net delta 43948.50 USD exceeds threshold 500.00"]
+    }
+  ],
+  "chart": [
+    { "label": "May 15", "equity_usd": 166420, "recorded_at": "2026-05-15T00:00:00Z" },
+    { "label": "May 15", "equity_usd": 167010, "recorded_at": "2026-05-15T04:00:00Z" },
+    { "label": "May 16", "equity_usd": 171200, "recorded_at": "2026-05-16T00:00:00Z" },
+    { "label": "May 17", "equity_usd": 174100, "recorded_at": "2026-05-17T00:00:00Z" },
+    { "label": "May 18", "equity_usd": 175955, "recorded_at": "2026-05-18T00:00:00Z" }
+  ],
+  "daily_changes": [
+    {
+      "date": "2026-05-18",
+      "equity_usd": 175955,
+      "change_usd": 1855,
+      "warning_count": 1,
+      "warnings": ["Net delta 43948.50 USD exceeds threshold 500.00"]
+    },
+    {
+      "date": "2026-05-17",
+      "equity_usd": 174100,
+      "change_usd": 2900,
+      "warning_count": 1,
+      "warnings": ["Net delta 970.00 USD exceeds threshold 500.00"]
+    },
+    {
+      "date": "2026-05-16",
+      "equity_usd": 171200,
+      "change_usd": 4190,
+      "warning_count": 1,
+      "warnings": ["Net delta 1280.00 USD exceeds threshold 500.00"]
+    },
+    {
+      "date": "2026-05-15",
+      "equity_usd": 167010,
+      "change_usd": null,
+      "warning_count": 0,
+      "warnings": []
+    }
+  ]
+}

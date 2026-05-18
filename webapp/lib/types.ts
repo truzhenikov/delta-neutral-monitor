@@ -42,6 +42,35 @@ export type Risk = {
   generated_at: string;
 };
 
+export type PortfolioHistorySnapshot = {
+  recorded_at: string;
+  total_equity_usd: number;
+  total_available_margin_usd: number;
+  total_maintenance_margin_usd: number;
+  warning_count: number;
+  warnings: string[];
+};
+
+export type HistoryChartPoint = {
+  label: string;
+  equity_usd: number;
+  recorded_at: string;
+};
+
+export type PortfolioHistoryDay = {
+  date: string;
+  equity_usd: number;
+  change_usd: number | null;
+  warning_count: number;
+  warnings: string[];
+};
+
+export type PortfolioHistoryPayload = {
+  snapshots: PortfolioHistorySnapshot[];
+  chart: HistoryChartPoint[];
+  daily_changes: PortfolioHistoryDay[];
+};
+
 export type StatusPayload = {
   total_equity_usd: number;
   total_available_margin_usd: number;
@@ -49,4 +78,6 @@ export type StatusPayload = {
   accounts: Account[];
   connector_statuses: ConnectorStatus[];
   risk: Risk;
+  current_snapshot: PortfolioHistorySnapshot;
+  source?: string;
 };

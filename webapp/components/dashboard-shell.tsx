@@ -4,16 +4,20 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { CompactExchangeOverview } from '@/components/compact-exchange-overview';
 import { ExchangeCard } from '@/components/exchange-card';
+import { HistoryChart } from '@/components/history-chart';
+import { HistoryTable } from '@/components/history-table';
+import { HistoryWarningLog } from '@/components/history-warning-log';
 import { SummaryCards } from '@/components/summary-cards';
-import { fetchStatus } from '@/lib/api';
+import { fetchHistory, fetchStatus } from '@/lib/api';
 import { DEFAULT_REFRESH_INTERVAL_MS, formatRefreshIntervalLabel, REFRESH_INTERVAL_OPTIONS, type RefreshIntervalMs } from '@/lib/refresh-interval';
-import { StatusPayload } from '@/lib/types';
+import { PortfolioHistoryPayload, StatusPayload } from '@/lib/types';
 
 type FilterMode = 'all' | 'with-positions' | 'errors';
 type SortMode = 'balance' | 'load' | 'pnl';
 
 export function DashboardShell() {
   const [data, setData] = useState<StatusPayload | null>(null);
+  const [history, setHistory] = useState<PortfolioHistoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -24,8 +28,9 @@ export function DashboardShell() {
   async function load() {
     try {
       setError(null);
-      const payload = await fetchStatus();
+      const [payload, historyPayload] = await Promise.all([fetchStatus(), fetchHistory()]);
       setData(payload);
+      setHistory(historyPayload);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard');
@@ -57,48 +62,41 @@ export function DashboardShell() {
     if (!data) return [];
 
     const connectorMap = new Map(data.connector_statuses.map((item) => [item.exchange, item]));
-
     const filtered = data.accounts.filter((account) => {
       if (filter === 'with-positions') return account.position_count > 0;
       if (filter === 'errors') return !connectorMap.get(account.exchange)?.ok;
       return true;
     });
 
-    const sorted = [...filtered].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       if (sort === 'load') return b.load_ratio - a.load_ratio;
       if (sort === 'pnl') return b.total_pnl_usd - a.total_pnl_usd;
       return b.equity_usd - a.equity_usd;
     });
-
-    return sorted;
   }, [data, filter, sort]);
 
   return (
-    <main className="dashboard-page">
-      <section className="dashboard-hero">
-        <div className="dashboard-hero-card">
+    <main className="dashboard-page editorial-dashboard">
+      <section className="dashboard-hero editorial-hero">
+        <div className="dashboard-hero-card hero-copy-card">
+          <div className="section-eyebrow">Editorial risk briefing</div>
           <h1 className="dashboard-title">Delta Neutral Monitor</h1>
           <div className="dashboard-subtitle">
-            Cross-exchange view of balances, margin usage, directional exposure, and open positions across the portfolio.
+            A cleaner editorial view of balances, warnings, portfolio history, margin load, and venue-level positioning across the landing dashboard.
           </div>
 
           <div className="hero-badges">
-            <div className="hero-badge">
-              Refresh cadence: <strong>{formatRefreshIntervalLabel(refreshIntervalMs)}</strong>
-            </div>
-            <div className="hero-badge">
-              Connectors online: <strong>{connectorHealth.ok}/{connectorHealth.total || '—'}</strong>
-            </div>
-            <div className="hero-badge">
-              Last refresh: <strong>{lastUpdated || '—'}</strong>
-            </div>
+            <div className="hero-badge">Refresh cadence <strong>{formatRefreshIntervalLabel(refreshIntervalMs)}</strong></div>
+            <div className="hero-badge">Connectors online <strong>{connectorHealth.ok}/{connectorHealth.total || '—'}</strong></div>
+            <div className="hero-badge">Last refresh <strong>{lastUpdated || '—'}</strong></div>
+            <div className="hero-badge">Source <strong>{data?.source === 'demo' ? 'Demo fallback' : 'Live API'}</strong></div>
           </div>
         </div>
 
-        <div className="control-card">
+        <div className="control-card editorial-control-card">
           <div>
             <div className="control-card-title">View controls</div>
-            <div className="control-grid" style={{ marginTop: 14 }}>
+            <div className="control-grid">
               <label className="control-label">
                 <span>Filter</span>
                 <select value={filter} onChange={(e) => setFilter(e.target.value as FilterMode)} className="dashboard-select">
@@ -117,55 +115,86 @@ export function DashboardShell() {
               </label>
               <label className="control-label">
                 <span>Auto refresh</span>
-                <select
-                  value={refreshIntervalMs}
-                  onChange={(e) => setRefreshIntervalMs(Number(e.target.value) as RefreshIntervalMs)}
-                  className="dashboard-select"
-                >
+                <select value={refreshIntervalMs} onChange={(e) => setRefreshIntervalMs(Number(e.target.value) as RefreshIntervalMs)} className="dashboard-select">
                   {REFRESH_INTERVAL_OPTIONS.map((value) => (
-                    <option key={value} value={value}>
-                      {formatRefreshIntervalLabel(value)}
-                    </option>
+                    <option key={value} value={value}>{formatRefreshIntervalLabel(value)}</option>
                   ))}
                 </select>
               </label>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gap: 12 }}>
+          <div className="control-stack">
             <button onClick={() => void load()} className="dashboard-button">Refresh now</button>
-            <div className="control-caption">Use filters to isolate stressed exchanges, tune auto-refresh to your pace, then sort by balance, load, or current PnL to scan risk faster.</div>
+            <div className="control-caption">Warnings stay visible in the current landing view, while four-hour history makes past warning regimes reviewable instead of ephemeral.</div>
           </div>
         </div>
       </section>
 
       {loading ? <Panel><div>Loading dashboard…</div></Panel> : null}
-      {error ? <Panel><div style={{ color: 'var(--red)' }}>Failed to load data: {error}</div></Panel> : null}
+      {error ? <Panel><div className="negative">Failed to load data: {error}</div></Panel> : null}
 
       {data ? (
         <>
           <SummaryCards data={data} />
-          <section style={{ marginTop: 20 }}>
+
+          <section className="dashboard-section">
+            <div className="section-heading-row">
+              <div>
+                <div className="section-eyebrow">Overview</div>
+                <h2 className="section-title">Current portfolio posture</h2>
+              </div>
+              <div className="soft-pill">Current snapshot {new Date(data.current_snapshot.recorded_at).toLocaleString()}</div>
+            </div>
             <CompactExchangeOverview accounts={visibleAccounts} />
           </section>
 
-          <section style={{ marginTop: 20, display: 'grid', gap: 12 }}>
+          <section className="dashboard-section">
             <Panel warning>
               <div className="warning-header">
                 <div className="warning-title">
+                  <div className="section-eyebrow">Live warnings</div>
                   <h2>Warnings</h2>
-                  <div className="warning-meta">Watchlist generated from current margin usage, liquidation distance, and net exposure.</div>
+                  <div className="warning-meta">Live warning list is preserved in the editorial layout and stored into every historical snapshot.</div>
                 </div>
                 <div className="health-pill">Connector health {connectorHealth.ok}/{connectorHealth.total}</div>
               </div>
-
               <ul className="warning-list">
                 {data.risk.warnings.length === 0 ? <li>No active warnings.</li> : data.risk.warnings.map((warning) => <li key={warning}>{warning}</li>)}
               </ul>
             </Panel>
           </section>
 
-          <section className="exchange-grid">
+          {history ? (
+            <section className="dashboard-section history-section">
+              <div className="section-heading-row">
+                <div>
+                  <div className="section-eyebrow">History</div>
+                  <h2 className="section-title">Portfolio history & warning archive</h2>
+                  <div className="section-subtle">Snapshots are persisted every four hours on the backend and exposed here as chart, table, and warning log.</div>
+                </div>
+                <div className="soft-pill">{history.snapshots.length} stored snapshots</div>
+              </div>
+              <div className="history-grid">
+                <HistoryChart history={history} />
+                <HistoryWarningLog history={history} />
+              </div>
+              <div className="surface-card">
+                <div className="section-eyebrow">Day by day</div>
+                <h3 className="section-title">Daily equity change table</h3>
+                <HistoryTable history={history} />
+              </div>
+            </section>
+          ) : null}
+
+          <section className="exchange-grid dashboard-section">
+            <div className="section-heading-row">
+              <div>
+                <div className="section-eyebrow">Venues</div>
+                <h2 className="section-title">Exchange detail cards</h2>
+              </div>
+              <div className="soft-pill">{visibleAccounts.length} exchanges in view</div>
+            </div>
             {visibleAccounts.map((account) => (
               <ExchangeCard
                 key={account.exchange}

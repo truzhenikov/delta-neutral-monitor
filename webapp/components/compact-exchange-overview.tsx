@@ -10,9 +10,10 @@ export function CompactExchangeOverview({ accounts }: { accounts: Account[] }) {
     <section className="surface-card compact-overview-card">
       <div className="compact-overview-header">
         <div>
-          <h2 className="compact-overview-title">Exchange Quick View</h2>
-          <div className="warning-meta">Compact scan of venue balance, position size, and real leverage.</div>
+          <h2 className="compact-overview-title">Portfolio overview tape</h2>
+          <div className="warning-meta">Minimalist table scan of balance, notional volume, and real leverage.</div>
         </div>
+        <div className="soft-pill">Table view</div>
       </div>
 
       <div className="compact-overview-table-wrap">

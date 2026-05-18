@@ -27,7 +27,7 @@ export function PositionsTable({ positions }: { positions: Position[] }) {
           {positions.map((position) => (
             <tr key={`${position.exchange}-${position.symbol}-${position.side}`}>
               <td>{position.symbol}</td>
-              <td style={{ textTransform: 'capitalize' }}>{position.side}</td>
+              <td style={{ textTransform: 'capitalize' }}><span className="soft-pill">{position.side}</span></td>
               <td>{formatNumber(position.size)}</td>
               <td>{formatMoney(position.notional_usd)}</td>
               <td>{formatNumber(position.entry_price)}</td>

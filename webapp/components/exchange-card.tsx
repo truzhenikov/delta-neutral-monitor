@@ -15,8 +15,7 @@ type ExchangeCardProps = {
 export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
   const [open, setOpen] = useState(account.position_count > 0);
   const statusLabel = connectorStatus?.ok ? 'online' : connectorStatus?.error || 'unknown';
-  const statusColor = connectorStatus?.ok ? 'var(--green)' : 'var(--red)';
-  const statusBackground = connectorStatus?.ok ? 'rgba(24, 195, 126, 0.12)' : 'rgba(242, 95, 92, 0.12)';
+  const statusClassName = connectorStatus?.ok ? 'soft-pill soft-pill-positive' : 'soft-pill soft-pill-danger';
   const loadBarColor = loadColor(account.load_ratio);
 
   const updatedAt = useMemo(() => new Date(account.updated_at).toLocaleString(), [account.updated_at]);
@@ -27,12 +26,11 @@ export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
     <article className="exchange-card">
       <div className="exchange-header">
         <div>
+          <div className="section-eyebrow">Venue</div>
           <h3 className="exchange-name">{account.exchange}</h3>
           <div className="exchange-meta">Updated {updatedAt}</div>
         </div>
-        <div className="status-pill" style={{ border: `1px solid ${statusColor}`, color: statusColor, background: statusBackground }}>
-          {statusLabel}
-        </div>
+        <div className={statusClassName}>{statusLabel}</div>
       </div>
 
       <div className="exchange-metrics">
@@ -48,8 +46,8 @@ export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
         <div className="liquidity-card">
           <div className="liquidity-header">
             <div>
-              <div className="liquidity-title">Liquidity Snapshot</div>
-              <div className="exchange-meta">Quick buffer summary for this venue</div>
+              <div className="liquidity-title">Liquidity snapshot</div>
+              <div className="exchange-meta">Quick venue buffer summary</div>
             </div>
             <div className={`liquidity-pill liquidity-pill-${liquidity.stressLevel}`}>{liquidityTone.label}</div>
           </div>
@@ -65,7 +63,7 @@ export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
         <div className="exchange-footer">
           <div className="load-cluster">
             <div className="load-header">
-              <span className="section-subtle">Exchange Load</span>
+              <span className="section-subtle">Exchange load</span>
               <span style={{ fontWeight: 700, color: loadBarColor }}>{formatPercent(account.load_ratio)}</span>
             </div>
             <div className="load-track">

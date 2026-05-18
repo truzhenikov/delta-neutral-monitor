@@ -337,5 +337,15 @@
       "Net delta 43948.50 USD exceeds threshold 500.00"
     ],
     "generated_at": "2026-05-16T22:03:37.420442Z"
+  },
+  "current_snapshot": {
+    "recorded_at": "2026-05-16T22:03:37.420442Z",
+    "total_equity_usd": 175955.0,
+    "total_available_margin_usd": 77000.0,
+    "total_maintenance_margin_usd": 36400.0,
+    "warning_count": 1,
+    "warnings": [
+      "Net delta 43948.50 USD exceeds threshold 500.00"
+    ]
   }
 }
