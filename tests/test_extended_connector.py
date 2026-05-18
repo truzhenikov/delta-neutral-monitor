@@ -17,6 +17,7 @@ class StubExtendedConnector(ExtendedRealConnector):
             "/api/v1/user/account/info",
             "/api/v1/user/balance",
             "/api/v1/user/positions",
+            "/api/v1/user/spot/balances",
         }
         assert headers == {"X-Api-Key": "key"}
         return self._responses.pop(0)
@@ -90,6 +91,33 @@ def test_extended_real_connector_maps_account_snapshot(monkeypatch) -> None:
             "status": "OK",
             "data": [
                 {
+                    "accountId": 230109,
+                    "asset": "USD",
+                    "balance": "168.513778",
+                    "indexPrice": "1",
+                    "notionalValue": "168.513778",
+                    "contributionFactor": "1",
+                    "equityContribution": "168.513778",
+                    "availableToWithdraw": "168.513778",
+                    "updatedAt": 1779030428936,
+                },
+                {
+                    "accountId": 230109,
+                    "asset": "XVS",
+                    "balance": "7313.6",
+                    "indexPrice": "1.093",
+                    "notionalValue": "7994.2648",
+                    "contributionFactor": "0.9",
+                    "equityContribution": "7194.83832",
+                    "availableToWithdraw": "4798.8",
+                    "updatedAt": 1779030428936,
+                },
+            ],
+        },
+        {
+            "status": "OK",
+            "data": [
+                {
                     "id": 1,
                     "accountId": 230109,
                     "market": "AAPL_24_5-USD",
@@ -134,7 +162,7 @@ def test_extended_real_connector_maps_account_snapshot(monkeypatch) -> None:
     snapshot = asyncio.run(connector.fetch_account_snapshot())
 
     assert snapshot.exchange == "extended"
-    assert snapshot.equity_usd == 7524.084059
+    assert snapshot.equity_usd == 8323.845463
     assert snapshot.available_margin_usd == 5008.43724
     assert snapshot.maintenance_margin_usd == pytest.approx(1258.0268546648)
     assert len(snapshot.positions) == 2

@@ -143,6 +143,7 @@ def test_aden_real_connector_normalizes_contract_size_using_value_field(monkeypa
     connector._responses = [
         {
             "total": "2918.109677131344",
+            "cross_margin_balance": "2816.772377131344",
             "available": "2495.321527131344",
             "maintenance_margin": "41.14885",
         },
@@ -162,6 +163,7 @@ def test_aden_real_connector_normalizes_contract_size_using_value_field(monkeypa
 
     snapshot = asyncio.run(connector.fetch_account_snapshot())
 
+    assert snapshot.equity_usd == 2816.772377131344
     assert len(snapshot.positions) == 1
     position = snapshot.positions[0]
     assert position.symbol == "COINX_USDT"

@@ -488,7 +488,12 @@ class AdenRealConnector(_BaseRealConnector):
 
         return AccountSnapshot(
             exchange=self.exchange,
-            equity_usd=_safe_float(account_payload.get("total") or account_payload.get("total_margin_balance")),
+            equity_usd=_safe_float(
+                account_payload.get("cross_margin_balance")
+                or account_payload.get("margin_balance")
+                or account_payload.get("total")
+                or account_payload.get("total_margin_balance")
+            ),
             available_margin_usd=_safe_float(account_payload.get("available") or account_payload.get("cross_available")),
             maintenance_margin_usd=_safe_float(
                 account_payload.get("maintenance_margin") or account_payload.get("cross_maintenance_margin")
@@ -663,6 +668,14 @@ class ExtendedRealConnector(_BaseRealConnector):
         if balance_payload.get("status") != "OK":
             raise RealConnectorRequestError(f"extended balance error: {balance_payload}")
 
+        spot_balances_payload = await self._get(
+            base_url=settings.extended_api_base,
+            path="/api/v1/user/spot/balances",
+            headers=headers,
+        )
+        if spot_balances_payload.get("status") != "OK":
+            raise RealConnectorRequestError(f"extended spot balances error: {spot_balances_payload}")
+
         positions_payload = await self._get(
             base_url=settings.extended_api_base,
             path="/api/v1/user/positions",
@@ -673,6 +686,7 @@ class ExtendedRealConnector(_BaseRealConnector):
 
         account_data = account_payload.get("data") or {}
         balance_data = balance_payload.get("data") or {}
+        spot_balances = spot_balances_payload.get("data") or []
         raw_positions = positions_payload.get("data") or []
 
         positions: list[Position] = []
@@ -695,9 +709,10 @@ class ExtendedRealConnector(_BaseRealConnector):
                 )
             )
 
-        equity = _safe_float(balance_data.get("equity"))
+        portfolio_value = sum(_safe_float(row.get("notionalValue")) for row in spot_balances)
+        equity = portfolio_value + _safe_float(balance_data.get("unrealisedPnl"))
         available = _safe_float(balance_data.get("availableForTrade"))
-        maintenance = equity * _safe_float(balance_data.get("marginRatio"))
+        maintenance = _safe_float(balance_data.get("equity")) * _safe_float(balance_data.get("marginRatio"))
 
         # Keep account payload consumed/validated even though the current snapshot
         # mapping is driven by balance + positions.
