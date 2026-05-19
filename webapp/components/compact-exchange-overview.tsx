@@ -2,7 +2,7 @@ import { formatMoney, formatNumber } from '@/lib/format';
 import { buildExchangeOverviewRows, buildExchangeOverviewTotals } from '@/lib/exchange-overview';
 import type { Account } from '@/lib/types';
 
-export function CompactExchangeOverview({ accounts }: { accounts: Account[] }) {
+export function CompactExchangeOverview({ accounts, staleExchanges }: { accounts: Account[]; staleExchanges: Set<string> }) {
   const rows = buildExchangeOverviewRows(accounts);
   const totals = buildExchangeOverviewTotals(accounts);
 
@@ -28,7 +28,7 @@ export function CompactExchangeOverview({ accounts }: { accounts: Account[] }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.exchange}>
+              <tr key={row.exchange} className={staleExchanges.has(row.exchange) ? 'stale-row' : undefined}>
                 <td className="compact-overview-exchange">{row.exchange}</td>
                 <td>{formatMoney(row.balanceUsd)}</td>
                 <td>{formatMoney(row.positionNotionalUsd)}</td>

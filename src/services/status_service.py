@@ -84,7 +84,8 @@ class StatusService:
             warnings=risk.warnings,
             generated_at=risk.generated_at,
         )
-        if self.history_service is not None:
+        should_record_history = self.history_service is not None and all(status.ok for status in (connector_statuses or []))
+        if should_record_history:
             current_snapshot = self.history_service.record(current_snapshot)
 
         return StatusOut(

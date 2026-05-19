@@ -7,6 +7,15 @@ from src.core.risk import RiskEngine
 from src.services.status_service import StatusService
 
 
+class RecordingHistoryService:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def record(self, snapshot):
+        self.calls.append(snapshot)
+        return snapshot
+
+
 def test_build_status_includes_exchange_level_aggregates() -> None:
     updated_at = datetime(2026, 5, 16, tzinfo=timezone.utc)
     account = AccountSnapshot(
@@ -78,3 +87,30 @@ def test_build_status_includes_embedded_history_snapshot() -> None:
     assert status.current_snapshot.total_equity_usd == 1000.0
     assert status.current_snapshot.warning_count == len(status.risk.warnings)
     assert status.current_snapshot.warnings == status.risk.warnings
+
+
+def test_build_status_skips_history_persistence_when_any_connector_is_stale() -> None:
+    updated_at = datetime(2026, 5, 18, 0, 0, tzinfo=timezone.utc)
+    account = AccountSnapshot(
+        exchange="bitget",
+        equity_usd=1000.0,
+        available_margin_usd=600.0,
+        maintenance_margin_usd=120.0,
+        updated_at=updated_at,
+        positions=[],
+    )
+    history_service = RecordingHistoryService()
+    service = StatusService(
+        RiskEngine(max_margin_ratio=0.75, min_liq_distance_pct=12.0, max_abs_net_delta_usd=500.0),
+        history_service=history_service,
+    )
+
+    status = service.build_status(
+        [account],
+        [
+            ConnectorStatus(exchange="bitget", ok=False, error="timeout", updated_at=updated_at),
+        ],
+    )
+
+    assert status.current_snapshot.total_equity_usd == 1000.0
+    assert history_service.calls == []

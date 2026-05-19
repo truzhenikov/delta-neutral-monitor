@@ -355,6 +355,10 @@ select {
   background: rgba(241, 201, 207, 0.24) !important;
 }
 
+.stale-row {
+  background: rgba(180, 79, 75, 0.08) !important;
+}
+
 .compact-overview-total-row td {
   font-weight: 700;
 }
@@ -367,6 +371,11 @@ select {
 .exchange-card {
   display: grid;
   gap: 18px;
+}
+
+.exchange-card-stale {
+  border-color: rgba(180, 79, 75, 0.32);
+  background: linear-gradient(180deg, rgba(255, 247, 247, 0.95), rgba(255, 241, 241, 0.92));
 }
 
 .exchange-name {
@@ -520,6 +529,10 @@ select {
   display: grid;
   gap: 12px;
   margin-top: 18px;
+}
+
+.history-warning-card {
+  margin-top: 14px;
 }
 
 .history-warning-entry ul {

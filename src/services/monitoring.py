@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from datetime import datetime
+from pathlib import Path
 
 from src.connectors.base import ExchangeConnector
-from src.core.models import AccountSnapshot, ConnectorStatus, utc_now
+from src.core.models import AccountSnapshot, ConnectorStatus, Position, utc_now
 
 logger = logging.getLogger(__name__)
 
 
 class MonitoringService:
-    def __init__(self, connectors: list[ExchangeConnector]) -> None:
+    def __init__(self, connectors: list[ExchangeConnector], cache_path: Path | None = None) -> None:
         self.connectors = connectors
+        self.cache_path = cache_path
 
     async def _fetch_with_retry(self, connector: ExchangeConnector) -> AccountSnapshot:
         try:
@@ -34,12 +38,16 @@ class MonitoringService:
             *(self._fetch_with_retry(c) for c in self.connectors), return_exceptions=True
         )
 
-        accounts: list[AccountSnapshot] = []
+        cached_accounts = self._read_cached_accounts()
+        accounts_by_exchange: dict[str, AccountSnapshot] = {account.exchange: account for account in cached_accounts}
         statuses: list[ConnectorStatus] = []
+        live_accounts_seen = False
         for idx, result in enumerate(results):
             exchange = getattr(self.connectors[idx], "exchange", f"connector_{idx}")
             if isinstance(result, Exception):
                 logger.warning("connector_failed exchange=%s error=%s", exchange, result)
+                if exchange in accounts_by_exchange:
+                    logger.info("connector_reusing_cached_snapshot exchange=%s", exchange)
                 statuses.append(
                     ConnectorStatus(
                         exchange=exchange,
@@ -49,7 +57,8 @@ class MonitoringService:
                     )
                 )
                 continue
-            accounts.append(result)
+            live_accounts_seen = True
+            accounts_by_exchange[exchange] = result
             statuses.append(
                 ConnectorStatus(
                     exchange=exchange,
@@ -58,4 +67,69 @@ class MonitoringService:
                     updated_at=utc_now(),
                 )
             )
+
+        accounts = [accounts_by_exchange[status.exchange] for status in statuses if status.exchange in accounts_by_exchange]
+        if live_accounts_seen:
+            self._write_cached_accounts(accounts)
         return accounts, statuses
+
+    def _read_cached_accounts(self) -> list[AccountSnapshot]:
+        if self.cache_path is None or not self.cache_path.exists():
+            return []
+        try:
+            payload = json.loads(self.cache_path.read_text(encoding="utf-8"))
+            return [self._account_from_dict(item) for item in payload]
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            logger.warning("connector_cache_read_failed path=%s error=%s", self.cache_path, exc)
+            return []
+
+    def _write_cached_accounts(self, accounts: list[AccountSnapshot]) -> None:
+        if self.cache_path is None:
+            return
+        self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = [self._account_to_dict(account) for account in accounts]
+        self.cache_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def _account_to_dict(self, account: AccountSnapshot) -> dict:
+        return {
+            "exchange": account.exchange,
+            "equity_usd": account.equity_usd,
+            "available_margin_usd": account.available_margin_usd,
+            "maintenance_margin_usd": account.maintenance_margin_usd,
+            "updated_at": account.updated_at.isoformat(),
+            "positions": [
+                {
+                    "exchange": position.exchange,
+                    "symbol": position.symbol,
+                    "side": position.side,
+                    "size": position.size,
+                    "entry_price": position.entry_price,
+                    "mark_price": position.mark_price,
+                    "leverage": position.leverage,
+                    "liquidation_price": position.liquidation_price,
+                }
+                for position in account.positions
+            ],
+        }
+
+    def _account_from_dict(self, payload: dict) -> AccountSnapshot:
+        return AccountSnapshot(
+            exchange=payload["exchange"],
+            equity_usd=payload["equity_usd"],
+            available_margin_usd=payload["available_margin_usd"],
+            maintenance_margin_usd=payload["maintenance_margin_usd"],
+            updated_at=datetime.fromisoformat(payload["updated_at"]),
+            positions=[
+                Position(
+                    exchange=position["exchange"],
+                    symbol=position["symbol"],
+                    side=position["side"],
+                    size=position["size"],
+                    entry_price=position["entry_price"],
+                    mark_price=position["mark_price"],
+                    leverage=position["leverage"],
+                    liquidation_price=position["liquidation_price"],
+                )
+                for position in payload.get("positions", [])
+            ],
+        )

@@ -32,10 +32,10 @@ export function buildDailyHistoryRows(history: PortfolioHistoryPayload): Array<{
 
   const latestPerDay = new Map<string, PortfolioHistorySnapshot>();
   for (const snapshot of history.snapshots) {
-    latestPerDay.set(snapshot.recorded_at.slice(0, 10), snapshot);
+    latestPerDay.set(buildHistoryDayKey(snapshot.recorded_at), snapshot);
   }
 
-  const orderedDays = [...latestPerDay.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const orderedDays = Array.from(latestPerDay.entries()).sort(([a], [b]) => a.localeCompare(b));
   let previousEquity: number | null = null;
   const rows: Array<{ date: string; equityUsd: number; changeUsd: number | null; warningCount: number; warnings: string[] }> = [];
 
@@ -67,4 +67,9 @@ export function buildHistoryPayloadFromSnapshots(snapshots: PortfolioHistorySnap
     warnings: row.warnings,
   }));
   return { snapshots, chart, daily_changes };
+}
+
+function buildHistoryDayKey(recordedAt: string): string {
+  const timestamp = new Date(recordedAt);
+  return new Date(timestamp.getTime() - 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }

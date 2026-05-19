@@ -14,8 +14,9 @@ type ExchangeCardProps = {
 
 export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
   const [open, setOpen] = useState(account.position_count > 0);
-  const statusLabel = connectorStatus?.ok ? 'online' : connectorStatus?.error || 'unknown';
+  const statusLabel = connectorStatus?.ok ? 'online' : connectorStatus?.error || 'stale';
   const statusClassName = connectorStatus?.ok ? 'soft-pill soft-pill-positive' : 'soft-pill soft-pill-danger';
+  const isStale = connectorStatus?.ok === false;
   const loadBarColor = loadColor(account.load_ratio);
 
   const updatedAt = useMemo(() => new Date(account.updated_at).toLocaleString(), [account.updated_at]);
@@ -23,12 +24,14 @@ export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
   const liquidityTone = liquidityStressTone(liquidity.stressLevel);
 
   return (
-    <article className="exchange-card">
+    <article className={`exchange-card${isStale ? ' exchange-card-stale' : ''}`}>
       <div className="exchange-header">
         <div>
           <div className="section-eyebrow">Venue</div>
           <h3 className="exchange-name">{account.exchange}</h3>
-          <div className="exchange-meta">Updated {updatedAt}</div>
+          <div className={`exchange-meta${isStale ? ' negative' : ''}`}>
+            Updated {updatedAt}{isStale ? ' · stale data' : ''}
+          </div>
         </div>
         <div className={statusClassName}>{statusLabel}</div>
       </div>
@@ -39,7 +42,6 @@ export function ExchangeCard({ account, connectorStatus }: ExchangeCardProps) {
         <Metric label="Maintenance" value={formatMoney(account.maintenance_margin_usd)} />
         <Metric label="Positions" value={String(account.position_count)} />
         <Metric label="PnL" value={formatMoney(account.total_pnl_usd)} tone={account.total_pnl_usd >= 0 ? 'var(--green)' : 'var(--red)'} />
-        <Metric label="Delta" value={formatMoney(account.total_delta_usd)} tone={account.total_delta_usd >= 0 ? 'var(--green)' : 'var(--red)'} />
       </div>
 
       <div className="exchange-layers">

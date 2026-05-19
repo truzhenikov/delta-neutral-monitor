@@ -2,7 +2,7 @@
 Description=Run Delta Neutral Monitor portfolio history capture every 4 hours
 
 [Timer]
-OnCalendar=*-*-* 00/4:00:00
+OnCalendar=*-*-* 02/4:00:00
 Persistent=true
 Unit=delta-neutral-monitor-history.service
 

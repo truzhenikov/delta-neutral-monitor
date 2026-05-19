@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from pathlib import Path
 
 from src.connectors.base import ExchangeConnector
 from src.core.models import AccountSnapshot
@@ -35,6 +36,26 @@ class HardFailConnector(ExchangeConnector):
         raise RuntimeError("invalid api key")
 
 
+class SuccessThenFailConnector(ExchangeConnector):
+    exchange = "okx"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        self.calls += 1
+        if self.calls == 1:
+            return AccountSnapshot(
+                exchange=self.exchange,
+                equity_usd=250.0,
+                available_margin_usd=150.0,
+                maintenance_margin_usd=25.0,
+                positions=[],
+                updated_at=datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc),
+            )
+        raise RuntimeError("timeout")
+
+
 def test_monitoring_service_retries_timestamp_errors_once() -> None:
     connector = FlakyTimestampConnector()
     service = MonitoringService([connector])
@@ -56,3 +77,19 @@ def test_monitoring_service_does_not_retry_non_timestamp_errors() -> None:
     assert statuses[0].exchange == "kucoin"
     assert statuses[0].ok is False
     assert statuses[0].error == "invalid api key"
+
+
+def test_monitoring_service_reuses_last_snapshot_when_exchange_times_out(tmp_path: Path) -> None:
+    connector = SuccessThenFailConnector()
+    service = MonitoringService([connector], cache_path=tmp_path / "latest-accounts.json")
+
+    first_accounts, first_statuses = asyncio.run(service.collect_with_status())
+    second_accounts, second_statuses = asyncio.run(service.collect_with_status())
+
+    assert [account.exchange for account in first_accounts] == ["okx"]
+    assert first_statuses[0].ok is True
+    assert [account.exchange for account in second_accounts] == ["okx"]
+    assert second_accounts[0].equity_usd == 250.0
+    assert second_accounts[0].updated_at == datetime(2026, 5, 19, 10, 0, tzinfo=timezone.utc)
+    assert second_statuses[0].ok is False
+    assert second_statuses[0].error == "timeout"

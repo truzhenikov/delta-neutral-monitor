@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -97,7 +97,8 @@ async def send_alerts_for_snapshot(
 
 async def send_due_daily_reports(bot: Any, preferences, daily_report_service, now: datetime | None = None) -> None:
     effective_now = now or datetime.now(timezone.utc)
-    report = daily_report_service.build_report_for_date(effective_now.date())
+    report_day_key = daily_report_service.report_day_key(effective_now)
+    report = daily_report_service.build_report_for_date(date.fromisoformat(report_day_key))
     if report is None:
         return
     current, previous = report
@@ -107,7 +108,7 @@ async def send_due_daily_reports(bot: Any, preferences, daily_report_service, no
         if not daily_report_service.should_send(chat_settings, effective_now):
             continue
         await bot.send_message(chat_id=chat_id, text=text)
-        preferences.mark_daily_report_sent(chat_id, effective_now.date().isoformat())
+        preferences.mark_daily_report_sent(chat_id, report_day_key)
 
 
 async def alert_loop(bot: Bot, stop_event: asyncio.Event) -> None:

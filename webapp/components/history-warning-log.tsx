@@ -1,13 +1,11 @@
 import type { PortfolioHistoryPayload } from '@/lib/types';
 
 export function HistoryWarningLog({ history }: { history: PortfolioHistoryPayload }) {
-  const snapshotsWithWarnings = history.snapshots.filter((snapshot) => snapshot.warning_count > 0).slice().reverse();
+  const snapshotsWithWarnings = history.snapshots.filter((snapshot) => snapshot.warning_count > 0).slice().reverse().slice(0, 2);
 
   return (
     <section className="surface-card history-warning-card">
       <div className="section-eyebrow">Historical Warnings</div>
-      <h3 className="section-title">Past warning states are preserved</h3>
-      <div className="section-subtle">Every stored snapshot keeps its warning list so you can audit stress periods later.</div>
 
       <div className="history-warning-log">
         {snapshotsWithWarnings.length === 0 ? (

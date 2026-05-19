@@ -19,11 +19,13 @@ from src.services.telegram_preferences import TelegramPreferencesService
 @lru_cache(maxsize=1)
 def get_monitoring_service() -> MonitoringService:
     settings = get_settings()
+    history_storage_dir = Path(settings.history_storage_dir)
     return MonitoringService(
         connectors=build_connectors(
             settings.exchanges,
             use_mock_data=settings.use_mock_data,
-        )
+        ),
+        cache_path=history_storage_dir / "latest-accounts.json",
     )
 
 

@@ -59,7 +59,7 @@ class HistoryService:
 
         latest_per_day: dict[str, PortfolioHistorySnapshotOut] = {}
         for item in snapshots:
-            latest_per_day[item.recorded_at.date().isoformat()] = item
+            latest_per_day[self.history_day_key(item.recorded_at)] = item
 
         ordered_days = sorted(latest_per_day.items())
         daily_changes: list[PortfolioHistorySummaryOut] = []
@@ -79,10 +79,16 @@ class HistoryService:
 
         return PortfolioHistoryOut(snapshots=snapshots, chart=chart, daily_changes=list(reversed(daily_changes)))
 
+    def history_day_key(self, value: datetime) -> str:
+        utc_value = value.astimezone(timezone.utc)
+        shifted = utc_value - timedelta(hours=2)
+        return shifted.date().isoformat()
+
     def _normalize_bucket(self, value: datetime) -> datetime:
         utc_value = value.astimezone(timezone.utc)
-        bucket_hour = (utc_value.hour // self.interval_hours) * self.interval_hours
-        return utc_value.replace(hour=bucket_hour, minute=0, second=0, microsecond=0)
+        shifted = utc_value - timedelta(hours=2)
+        bucket_hour = (shifted.hour // self.interval_hours) * self.interval_hours
+        return shifted.replace(hour=bucket_hour, minute=0, second=0, microsecond=0) + timedelta(hours=2)
 
     def _write_history(self, snapshots: list[PortfolioHistorySnapshotOut]) -> None:
         self.storage_dir.mkdir(parents=True, exist_ok=True)

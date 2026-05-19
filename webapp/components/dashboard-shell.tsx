@@ -75,6 +75,10 @@ export function DashboardShell() {
     });
   }, [data, filter, sort]);
 
+  const staleExchanges = useMemo(() => new Set(
+    data?.connector_statuses.filter((item) => !item.ok).map((item) => item.exchange) ?? [],
+  ), [data]);
+
   return (
     <main className="dashboard-page editorial-dashboard">
       <section className="dashboard-hero editorial-hero">
@@ -126,7 +130,6 @@ export function DashboardShell() {
 
           <div className="control-stack">
             <button onClick={() => void load()} className="dashboard-button">Refresh now</button>
-            <div className="control-caption">Warnings stay visible in the current landing view, while four-hour history makes past warning regimes reviewable instead of ephemeral.</div>
           </div>
         </div>
       </section>
@@ -146,7 +149,7 @@ export function DashboardShell() {
               </div>
               <div className="soft-pill">Current snapshot {new Date(data.current_snapshot.recorded_at).toLocaleString()}</div>
             </div>
-            <CompactExchangeOverview accounts={visibleAccounts} />
+            <CompactExchangeOverview accounts={visibleAccounts} staleExchanges={staleExchanges} />
           </section>
 
           <section className="dashboard-section">
@@ -170,18 +173,16 @@ export function DashboardShell() {
               <div className="section-heading-row">
                 <div>
                   <div className="section-eyebrow">History</div>
-                  <h2 className="section-title">Portfolio history & warning archive</h2>
-                  <div className="section-subtle">Snapshots are persisted every four hours on the backend and exposed here as chart, table, and warning log.</div>
+                  <h2 className="section-title">Portfolio history</h2>
                 </div>
                 <div className="soft-pill">{history.snapshots.length} stored snapshots</div>
               </div>
-              <div className="history-grid">
-                <HistoryChart history={history} />
-                <HistoryWarningLog history={history} />
-              </div>
+              <HistoryChart history={history} />
+              <HistoryWarningLog history={history} />
               <div className="surface-card">
                 <div className="section-eyebrow">Day by day</div>
                 <h3 className="section-title">Daily equity change table</h3>
+                <div className="section-subtle">Boundary: 05:00 MSK.</div>
                 <HistoryTable history={history} />
               </div>
             </section>
