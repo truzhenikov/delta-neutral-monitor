@@ -13,6 +13,21 @@ export function buildHistoryChartPoints(snapshots: PortfolioHistorySnapshot[]): 
   }));
 }
 
+export function buildHistorySeries(history: PortfolioHistoryPayload): Array<{ label: string; equityUsd: number; recordedAt: string }> {
+  if (history.daily_changes.length > 0) {
+    return history.daily_changes
+      .slice()
+      .reverse()
+      .map((row) => ({
+        label: new Date(`${row.date}T00:00:00.000Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        equityUsd: row.equity_usd,
+        recordedAt: row.date,
+      }));
+  }
+
+  return buildHistoryChartPoints(history.snapshots);
+}
+
 export function buildDailyHistoryRows(history: PortfolioHistoryPayload): Array<{
   date: string;
   equityUsd: number;

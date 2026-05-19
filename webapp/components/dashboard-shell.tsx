@@ -6,7 +6,6 @@ import { CompactExchangeOverview } from '@/components/compact-exchange-overview'
 import { ExchangeCard } from '@/components/exchange-card';
 import { HistoryChart } from '@/components/history-chart';
 import { HistoryTable } from '@/components/history-table';
-import { HistoryWarningLog } from '@/components/history-warning-log';
 import { SummaryCards } from '@/components/summary-cards';
 import { fetchHistory, fetchStatus } from '@/lib/api';
 import { DEFAULT_REFRESH_INTERVAL_MS, formatRefreshIntervalLabel, REFRESH_INTERVAL_OPTIONS, type RefreshIntervalMs } from '@/lib/refresh-interval';
@@ -158,7 +157,7 @@ export function DashboardShell() {
                 <div className="warning-title">
                   <div className="section-eyebrow">Live warnings</div>
                   <h2>Warnings</h2>
-                  <div className="warning-meta">Live warning list is preserved in the editorial layout and stored into every historical snapshot.</div>
+                  <div className="warning-meta">Current risk flags across the portfolio.</div>
                 </div>
                 <div className="health-pill">Connector health {connectorHealth.ok}/{connectorHealth.total}</div>
               </div>
@@ -178,7 +177,6 @@ export function DashboardShell() {
                 <div className="soft-pill">{history.snapshots.length} stored snapshots</div>
               </div>
               <HistoryChart history={history} />
-              <HistoryWarningLog history={history} />
               <div className="surface-card">
                 <div className="section-eyebrow">Day by day</div>
                 <h3 className="section-title">Daily equity change table</h3>

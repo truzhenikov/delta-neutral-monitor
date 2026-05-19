@@ -1,7 +1,7 @@
 import test from 'node:test';
 import * as assert from 'node:assert/strict';
 
-import { buildDailyHistoryRows, buildHistoryChartPoints } from './history';
+import { buildDailyHistoryRows, buildHistoryChartPoints, buildHistorySeries } from './history';
 import { calculateLiqDistancePct } from './position-metrics';
 import type { PortfolioHistoryPayload } from './types';
 
@@ -42,6 +42,33 @@ test('buildHistoryChartPoints covers all snapshots', () => {
   assert.equal(chart.length, sampleHistory.snapshots.length);
   assert.equal(chart[0]?.label, 'May 17');
   assert.equal(chart[2]?.equityUsd, 980);
+});
+
+test('buildHistorySeries prefers day-level points so the chart renders one point per business day', () => {
+  const chart = buildHistorySeries({
+    ...sampleHistory,
+    daily_changes: [
+      {
+        date: '2026-05-18',
+        equity_usd: 980,
+        change_usd: -100,
+        warning_count: 2,
+        warnings: ['warning-b'],
+      },
+      {
+        date: '2026-05-17',
+        equity_usd: 1080,
+        change_usd: 80,
+        warning_count: 1,
+        warnings: ['warning-a'],
+      },
+    ],
+  });
+
+  assert.equal(chart.length, 2);
+  assert.deepEqual(chart.map((point) => point.recordedAt), ['2026-05-17', '2026-05-18']);
+  assert.equal(chart[0]?.label, 'May 17');
+  assert.equal(chart[1]?.equityUsd, 980);
 });
 
 test('buildDailyHistoryRows groups latest snapshot per day and carries warnings', () => {
