@@ -7,9 +7,13 @@ from src.config import get_settings
 from src.connectors.factory import build_connectors
 from src.core.risk import RiskEngine
 from src.services.alerting import AlertingService
+from src.services.credential_store import CredentialStore
+from src.services.credential_validation import CredentialValidationService, build_default_credential_validation_service
+from src.services.daily_report_service import DailyReportService
 from src.services.history_service import HistoryService
 from src.services.monitoring import MonitoringService
 from src.services.status_service import StatusService
+from src.services.telegram_preferences import TelegramPreferencesService
 
 
 @lru_cache(maxsize=1)
@@ -48,3 +52,31 @@ def get_status_service() -> StatusService:
 def get_alerting_service() -> AlertingService:
     settings = get_settings()
     return AlertingService(cooldown_sec=settings.alert_cooldown_sec)
+
+
+@lru_cache(maxsize=1)
+def get_daily_report_service() -> DailyReportService:
+    return DailyReportService(history_service=get_history_service())
+
+
+@lru_cache(maxsize=1)
+def get_telegram_preferences_service() -> TelegramPreferencesService:
+    settings = get_settings()
+    return TelegramPreferencesService(
+        state_path=Path(settings.telegram_state_path),
+        admin_chat_ids=settings.telegram_admin_chat_ids_list,
+        daily_report_hour_utc=settings.telegram_daily_report_hour_utc,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_credential_store() -> CredentialStore:
+    settings = get_settings()
+    return CredentialStore(storage_path=Path(settings.credential_store_path))
+
+
+@lru_cache(maxsize=1)
+def get_credential_validation_service() -> CredentialValidationService:
+    return build_default_credential_validation_service(
+        supported_exchanges=sorted(CredentialStore.SUPPORTED_EXCHANGES)
+    )

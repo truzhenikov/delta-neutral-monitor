@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
     telegram_alert_chat_id: str = Field(default="", alias="TELEGRAM_ALERT_CHAT_ID")
+    telegram_state_path: str = Field(default="data/telegram/state.json", alias="TELEGRAM_STATE_PATH")
+    credential_store_path: str = Field(default="data/credentials/exchanges.json", alias="CREDENTIAL_STORE_PATH")
+    telegram_admin_chat_ids: str = Field(default="", alias="TELEGRAM_ADMIN_CHAT_IDS")
+    telegram_daily_report_hour_utc: int = Field(default=7, alias="TELEGRAM_DAILY_REPORT_HOUR_UTC")
 
     use_mock_data: bool = Field(default=True, alias="USE_MOCK_DATA")
     request_timeout_sec: float = Field(default=10.0, alias="REQUEST_TIMEOUT_SEC")
@@ -75,6 +79,10 @@ class Settings(BaseSettings):
     @property
     def exchanges(self) -> list[str]:
         return [x.strip().lower() for x in self.enabled_exchanges.split(",") if x.strip()]
+
+    @property
+    def telegram_admin_chat_ids_list(self) -> list[str]:
+        return [x.strip() for x in self.telegram_admin_chat_ids.split(",") if x.strip()]
 
 
 @lru_cache(maxsize=1)

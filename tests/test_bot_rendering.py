@@ -1,0 +1,118 @@
+from __future__ import annotations
+
+
+def sample_status() -> dict:
+    return {
+        "total_equity_usd": 42126.34,
+        "total_available_margin_usd": 16172.42,
+        "total_maintenance_margin_usd": 6536.58,
+        "accounts": [
+            {
+                "exchange": "hyperliquid",
+                "equity_usd": 9552.39,
+                "available_margin_usd": 100.0,
+                "maintenance_margin_usd": 1000.0,
+                "position_count": 8,
+                "total_notional_usd": 68731.01,
+                "total_pnl_usd": -100.0,
+                "total_delta_usd": 68731.01,
+                "load_ratio": 0.1,
+                "updated_at": "2026-05-18T19:54:57Z",
+                "positions": [],
+            },
+            {
+                "exchange": "extended",
+                "equity_usd": 8046.41,
+                "available_margin_usd": 4758.64,
+                "maintenance_margin_usd": 1244.30,
+                "position_count": 2,
+                "total_notional_usd": 24883.40,
+                "total_pnl_usd": -111.88,
+                "total_delta_usd": 24883.40,
+                "load_ratio": 0.15,
+                "updated_at": "2026-05-18T19:54:57Z",
+                "positions": [],
+            },
+        ],
+        "connector_statuses": [
+            {"exchange": "hyperliquid", "ok": True, "error": None, "updated_at": "2026-05-18T19:54:57Z"},
+            {"exchange": "extended", "ok": False, "error": "timeout", "updated_at": "2026-05-18T19:54:57Z"},
+        ],
+        "risk": {
+            "net_delta_usd": -52.98,
+            "margin_ratio": 0.155,
+            "min_liq_distance_pct": 9.68,
+            "risk_level": "medium",
+            "warnings": ["Min liquidation distance 9.68% <= threshold 12.00%"],
+            "generated_at": "2026-05-18T19:54:57Z",
+        },
+        "current_snapshot": {
+            "recorded_at": "2026-05-18T16:00:00Z",
+            "total_equity_usd": 42126.34,
+            "total_available_margin_usd": 16172.42,
+            "total_maintenance_margin_usd": 6536.58,
+            "warning_count": 1,
+            "warnings": ["Min liquidation distance 9.68% <= threshold 12.00%"],
+        },
+    }
+
+
+def test_render_portfolio_text_includes_core_totals_and_exchange_breakdown() -> None:
+    from src.bot.rendering import render_portfolio_text
+
+    text = render_portfolio_text(sample_status())
+
+    assert "Portfolio summary" in text
+    assert "42,126.34 USD" in text
+    assert "16,172.42 USD" in text
+    assert "6,536.58 USD" in text
+    assert "-52.98 USD" in text
+    assert "medium" in text
+    assert "Connectors down: extended" in text
+    assert "Hyperliquid: 9,552.39 USD" in text
+    assert "Extended: 8,046.41 USD" in text
+
+
+def test_render_daily_report_text_includes_previous_day_delta_and_percent() -> None:
+    from src.bot.rendering import render_daily_report_text
+
+    current = {"date": "2026-05-18", "equity_usd": 42126.34, "warning_count": 1}
+    previous = {"date": "2026-05-17", "equity_usd": 41300.00, "warning_count": 0}
+
+    text = render_daily_report_text(current, previous)
+
+    assert "Daily portfolio report" in text
+    assert "2026-05-18" in text
+    assert "42,126.34 USD" in text
+    assert "41,300.00 USD" in text
+    assert "+826.34 USD" in text
+    assert "+2.00%" in text
+
+
+def test_render_daily_report_text_handles_missing_previous_day() -> None:
+    from src.bot.rendering import render_daily_report_text
+
+    current = {"date": "2026-05-18", "equity_usd": 42126.34, "warning_count": 1}
+
+    text = render_daily_report_text(current, None)
+
+    assert "Daily portfolio report" in text
+    assert "42,126.34 USD" in text
+    assert "No previous day snapshot yet" in text
+
+
+def test_render_alert_settings_text_shows_enabled_flags() -> None:
+    from src.bot.rendering import render_alert_settings_text
+
+    text = render_alert_settings_text(
+        {
+            "alerts_enabled": True,
+            "daily_report_enabled": False,
+            "daily_report_hour_utc": 7,
+        }
+    )
+
+    assert "Alert settings" in text
+    assert "Liquidation/risk alerts: ON" in text
+    assert "Daily report: OFF" in text
+    assert "Scheduled hour (UTC): 07:00" in text
