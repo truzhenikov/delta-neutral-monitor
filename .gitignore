@@ -10,3 +10,4 @@ webapp/.next/
 webapp/.vercel/
 .vercel
 data/portfolio-history/
+data/runtime/

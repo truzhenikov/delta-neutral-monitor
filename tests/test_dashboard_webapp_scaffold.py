@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 
@@ -14,10 +13,6 @@ def test_webapp_scaffold_files_exist() -> None:
     assert (WEBAPP / "app" / "api" / "status" / "route.ts").exists()
 
 
-def test_demo_status_payload_has_accounts_and_totals() -> None:
-    payload_path = WEBAPP / "app" / "api" / "status" / "demo-status.json"
-    assert payload_path.exists()
-
-    payload = json.loads(payload_path.read_text(encoding="utf-8"))
-    assert payload["accounts"]
-    assert payload["total_equity_usd"] > 0
+def test_webapp_runtime_does_not_ship_demo_payload_files() -> None:
+    assert not (WEBAPP / "app" / "api" / "status" / "demo-status.json").exists()
+    assert not (WEBAPP / "app" / "api" / "history" / "demo-history.json").exists()

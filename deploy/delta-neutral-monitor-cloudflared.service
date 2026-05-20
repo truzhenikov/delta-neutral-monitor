@@ -1,0 +1,17 @@
+[Unit]
+Description=Delta Neutral Monitor quick Cloudflare tunnel with Vercel sync
+After=network-online.target delta-neutral-monitor-backend.service
+Wants=network-online.target
+Requires=delta-neutral-monitor-backend.service
+
+[Service]
+Type=simple
+User=root
+Environment=HOME=/root
+WorkingDirectory=/root/projects/delta-neutral-monitor
+ExecStart=/bin/bash /root/projects/delta-neutral-monitor/scripts/run_quick_tunnel_and_sync_vercel.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

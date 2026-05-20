@@ -1,15 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-
 import { NextResponse } from 'next/server';
 
 const DEFAULT_API_BASE = 'http://127.0.0.1:8080';
-
-async function readDemoStatus() {
-  const payloadPath = join(process.cwd(), 'app', 'api', 'status', 'demo-status.json');
-  const content = await readFile(payloadPath, 'utf-8');
-  return JSON.parse(content);
-}
 
 export async function GET() {
   const apiBase = process.env.MONITOR_API_BASE_URL || DEFAULT_API_BASE;
@@ -24,10 +15,16 @@ export async function GET() {
       const payload = await response.json();
       return NextResponse.json(payload, { status: 200 });
     }
-  } catch {
-    // Fall back to bundled demo data below.
-  }
 
-  const demoPayload = await readDemoStatus();
-  return NextResponse.json({ ...demoPayload, source: 'demo' }, { status: 200 });
+    const errorText = await response.text();
+    return NextResponse.json(
+      {
+        error: `Backend status request failed with ${response.status}${errorText ? `: ${errorText.slice(0, 300)}` : ''}`,
+      },
+      { status: 502 },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown backend status error';
+    return NextResponse.json({ error: `Backend status request failed: ${message}` }, { status: 502 });
+  }
 }

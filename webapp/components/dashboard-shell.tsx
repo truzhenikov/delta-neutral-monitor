@@ -25,17 +25,29 @@ export function DashboardShell() {
   const [refreshIntervalMs, setRefreshIntervalMs] = useState<RefreshIntervalMs>(DEFAULT_REFRESH_INTERVAL_MS);
 
   async function load() {
-    try {
-      setError(null);
-      const [payload, historyPayload] = await Promise.all([fetchStatus(), fetchHistory()]);
-      setData(payload);
-      setHistory(historyPayload);
+    setError(null);
+    // Keep rendering the latest successful status/history payload even when one of
+    // the background refresh requests fails.
+    const [statusResult, historyResult] = await Promise.allSettled([fetchStatus(), fetchHistory()]);
+
+    if (statusResult.status === 'fulfilled') {
+      setData(statusResult.value);
       setLastUpdated(new Date().toLocaleTimeString());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
-    } finally {
-      setLoading(false);
     }
+
+    if (historyResult.status === 'fulfilled') {
+      setHistory(historyResult.value);
+    }
+
+    const errors = [statusResult, historyResult]
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => result.reason instanceof Error ? result.reason.message : 'Failed to load dashboard');
+
+    if (errors.length > 0) {
+      setError(errors.join(' · '));
+    }
+
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -78,6 +90,9 @@ export function DashboardShell() {
     data?.connector_statuses.filter((item) => !item.ok).map((item) => item.exchange) ?? [],
   ), [data]);
 
+  const staleExchangeLabel = useMemo(() => Array.from(staleExchanges).join(', '), [staleExchanges]);
+  const snapshotUpdatedAt = data ? new Date(data.snapshot_updated_at).toLocaleString() : null;
+
   return (
     <main className="dashboard-page editorial-dashboard">
       <section className="dashboard-hero editorial-hero">
@@ -92,7 +107,7 @@ export function DashboardShell() {
             <div className="hero-badge">Refresh cadence <strong>{formatRefreshIntervalLabel(refreshIntervalMs)}</strong></div>
             <div className="hero-badge">Connectors online <strong>{connectorHealth.ok}/{connectorHealth.total || '—'}</strong></div>
             <div className="hero-badge">Last refresh <strong>{lastUpdated || '—'}</strong></div>
-            <div className="hero-badge">Source <strong>{data?.source === 'demo' ? 'Demo fallback' : 'Live API'}</strong></div>
+            <div className="hero-badge">Snapshot <strong>{data?.source === 'stale' ? 'Stale cached data' : 'Live data'}</strong></div>
           </div>
         </div>
 
@@ -134,10 +149,21 @@ export function DashboardShell() {
       </section>
 
       {loading ? <Panel><div>Loading dashboard…</div></Panel> : null}
-      {error ? <Panel><div className="negative">Failed to load data: {error}</div></Panel> : null}
+      {error ? <Panel><div className="negative">Failed to load data: {error}{data ? ' Showing the last successfully loaded dashboard snapshot.' : ''}</div></Panel> : null}
 
       {data ? (
         <>
+          {data.source === 'stale' ? (
+            <section className="dashboard-section">
+              <Panel warning>
+                <div className="negative">
+                  Some exchanges failed during the latest refresh. Showing cached data snapshot from <strong>{snapshotUpdatedAt || '—'}</strong>
+                  {staleExchangeLabel ? <> for: <strong>{staleExchangeLabel}</strong></> : null}.
+                </div>
+              </Panel>
+            </section>
+          ) : null}
+
           <SummaryCards data={data} />
 
           <section className="dashboard-section">
@@ -146,7 +172,7 @@ export function DashboardShell() {
                 <div className="section-eyebrow">Overview</div>
                 <h2 className="section-title">Current portfolio posture</h2>
               </div>
-              <div className="soft-pill">Current snapshot {new Date(data.current_snapshot.recorded_at).toLocaleString()}</div>
+              <div className="soft-pill">Snapshot as of {snapshotUpdatedAt || '—'}</div>
             </div>
             <CompactExchangeOverview accounts={visibleAccounts} staleExchanges={staleExchanges} />
           </section>

@@ -79,5 +79,6 @@ export type StatusPayload = {
   connector_statuses: ConnectorStatus[];
   risk: Risk;
   current_snapshot: PortfolioHistorySnapshot;
-  source?: string;
+  source: 'live' | 'stale';
+  snapshot_updated_at: string;
 };

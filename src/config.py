@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     telegram_admin_chat_ids: str = Field(default="", alias="TELEGRAM_ADMIN_CHAT_IDS")
     telegram_daily_report_hour_utc: int = Field(default=7, alias="TELEGRAM_DAILY_REPORT_HOUR_UTC")
 
-    use_mock_data: bool = Field(default=True, alias="USE_MOCK_DATA")
+    use_mock_data: bool = Field(default=False, alias="USE_MOCK_DATA")
     request_timeout_sec: float = Field(default=10.0, alias="REQUEST_TIMEOUT_SEC")
     alert_poll_interval_sec: int = Field(default=30, alias="ALERT_POLL_INTERVAL_SEC")
     alert_cooldown_sec: int = Field(default=300, alias="ALERT_COOLDOWN_SEC")

@@ -87,3 +87,5 @@ class StatusOut(BaseModel):
     connector_statuses: list[ConnectorStatusOut]
     risk: RiskOut
     current_snapshot: PortfolioHistorySnapshotOut
+    source: Literal["live", "stale"]
+    snapshot_updated_at: datetime

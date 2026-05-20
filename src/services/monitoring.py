@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+from src.config import get_settings
 from src.connectors.base import ExchangeConnector
 from src.core.models import AccountSnapshot, ConnectorStatus, Position, utc_now
 
@@ -34,11 +35,15 @@ class MonitoringService:
     async def collect_with_status(self) -> tuple[list[AccountSnapshot], list[ConnectorStatus]]:
         if not self.connectors:
             return [], []
+        timeout_sec = get_settings().request_timeout_sec
         results = await asyncio.gather(
-            *(self._fetch_with_retry(c) for c in self.connectors), return_exceptions=True
+            *(asyncio.wait_for(self._fetch_with_retry(c), timeout=timeout_sec) for c in self.connectors),
+            return_exceptions=True,
         )
 
         cached_accounts = self._read_cached_accounts()
+        # Keep the latest per-exchange snapshot on disk so connector outages degrade to
+        # stale data instead of wiping the exchange out of the portfolio view.
         accounts_by_exchange: dict[str, AccountSnapshot] = {account.exchange: account for account in cached_accounts}
         statuses: list[ConnectorStatus] = []
         live_accounts_seen = False
@@ -48,11 +53,12 @@ class MonitoringService:
                 logger.warning("connector_failed exchange=%s error=%s", exchange, result)
                 if exchange in accounts_by_exchange:
                     logger.info("connector_reusing_cached_snapshot exchange=%s", exchange)
+                error_text = str(result) or result.__class__.__name__.replace("Error", "").lower()
                 statuses.append(
                     ConnectorStatus(
                         exchange=exchange,
                         ok=False,
-                        error=str(result),
+                        error=error_text,
                         updated_at=utc_now(),
                     )
                 )

@@ -51,6 +51,8 @@ def build_status() -> StatusOut:
                 "warning_count": 1,
                 "warnings": ["Min liquidation distance 9.68% <= threshold 12.00%"],
             },
+            "source": "stale",
+            "snapshot_updated_at": now,
         }
     )
 

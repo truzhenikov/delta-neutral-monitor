@@ -114,3 +114,36 @@ def test_build_status_skips_history_persistence_when_any_connector_is_stale() ->
 
     assert status.current_snapshot.total_equity_usd == 1000.0
     assert history_service.calls == []
+
+
+def test_build_status_marks_response_as_stale_and_uses_oldest_account_timestamp() -> None:
+    older_updated_at = datetime(2026, 5, 18, 0, 0, tzinfo=timezone.utc)
+    newer_updated_at = datetime(2026, 5, 18, 0, 5, tzinfo=timezone.utc)
+    accounts = [
+        AccountSnapshot(
+            exchange="bitget",
+            equity_usd=1000.0,
+            available_margin_usd=600.0,
+            maintenance_margin_usd=120.0,
+            updated_at=newer_updated_at,
+            positions=[],
+        ),
+        AccountSnapshot(
+            exchange="okx",
+            equity_usd=2000.0,
+            available_margin_usd=1500.0,
+            maintenance_margin_usd=100.0,
+            updated_at=older_updated_at,
+            positions=[],
+        ),
+    ]
+    connector_statuses = [
+        ConnectorStatus(exchange="bitget", ok=True, error=None, updated_at=newer_updated_at),
+        ConnectorStatus(exchange="okx", ok=False, error="timeout", updated_at=newer_updated_at),
+    ]
+    service = StatusService(RiskEngine(max_margin_ratio=0.75, min_liq_distance_pct=12.0, max_abs_net_delta_usd=500.0))
+
+    status = service.build_status(accounts, connector_statuses)
+
+    assert status.source == "stale"
+    assert status.snapshot_updated_at == older_updated_at

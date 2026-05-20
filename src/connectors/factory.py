@@ -45,7 +45,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
 }
 
 
-def build_connectors(exchanges: list[str], use_mock_data: bool = True) -> list[ExchangeConnector]:
+def build_connectors(exchanges: list[str], use_mock_data: bool = False) -> list[ExchangeConnector]:
     connector_map = MOCK_CONNECTOR_MAP if use_mock_data else REAL_CONNECTOR_MAP
     connectors: list[ExchangeConnector] = []
     for exch in exchanges:

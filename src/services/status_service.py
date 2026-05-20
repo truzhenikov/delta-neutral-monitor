@@ -24,6 +24,10 @@ class StatusService:
         connector_statuses: list[ConnectorStatus] | None = None,
     ) -> StatusOut:
         risk = self.risk_engine.evaluate(accounts)
+        # When some connectors reuse cached account snapshots, the UI should expose
+        # the oldest account timestamp rather than the current response time.
+        snapshot_updated_at = min((account.updated_at for account in accounts), default=risk.generated_at)
+        has_stale_connectors = any(not status.ok for status in (connector_statuses or []))
 
         total_equity = sum(a.equity_usd for a in accounts)
         total_available = sum(a.available_margin_usd for a in accounts)
@@ -103,6 +107,8 @@ class StatusService:
                 generated_at=risk.generated_at,
             ),
             current_snapshot=current_snapshot,
+            source="stale" if has_stale_connectors else "live",
+            snapshot_updated_at=snapshot_updated_at,
         )
 
     def _build_current_snapshot(
