@@ -14,6 +14,8 @@ test('status and history API routes do not reference demo fallback payloads', as
 
   assert.doesNotMatch(statusRouteSource, /demo/i);
   assert.doesNotMatch(historyRouteSource, /demo/i);
+  assert.match(statusRouteSource, /normalizeApiBase/);
+  assert.match(historyRouteSource, /normalizeApiBase/);
   assert.match(statusRouteSource, /NextResponse\.json\(\{ error:/);
   assert.match(historyRouteSource, /NextResponse\.json\(\{ error:/);
 });

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 
-const DEFAULT_API_BASE = 'http://127.0.0.1:8080';
+import { normalizeApiBase } from '@/lib/api-base';
 
 export async function GET() {
-  const apiBase = process.env.MONITOR_API_BASE_URL || DEFAULT_API_BASE;
+  const apiBase = normalizeApiBase(process.env.MONITOR_API_BASE_URL);
 
   try {
     const response = await fetch(`${apiBase}/v1/status`, {

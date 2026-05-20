@@ -1,13 +1,16 @@
 [Unit]
 Description=Delta Neutral Monitor FastAPI backend
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/root/projects/delta-neutral-monitor
 Environment=APP_ENV=prod
 Environment=ENABLED_EXCHANGES=bitget,bingx,hyperliquid,extended,okx,kucoin,aden
-Environment=REQUEST_TIMEOUT_SEC=10
+Environment=REQUEST_TIMEOUT_SEC=20
+Environment=STATUS_CACHE_TTL_SEC=15
+ExecStartPre=/bin/bash /root/projects/delta-neutral-monitor/scripts/configure_kucoin_public_routes.sh
 ExecStart=/usr/local/lib/hermes-agent/venv/bin/python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8080
 Restart=always
 RestartSec=5

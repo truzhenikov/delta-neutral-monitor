@@ -8,6 +8,7 @@ Requires=delta-neutral-monitor-backend.service
 Type=simple
 User=root
 Environment=HOME=/root
+EnvironmentFile=-/etc/default/delta-neutral-monitor-cloudflared
 WorkingDirectory=/root/projects/delta-neutral-monitor
 ExecStart=/bin/bash /root/projects/delta-neutral-monitor/scripts/run_quick_tunnel_and_sync_vercel.sh
 Restart=always

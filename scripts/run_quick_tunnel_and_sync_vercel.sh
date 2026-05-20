@@ -49,9 +49,14 @@ fi
 # For fully stable production, prefer a named Cloudflare tunnel or an opened public reverse proxy.
 if [[ "$backend_url" != "$previous_url" ]]; then
   cd "$WEBAPP_DIR"
-  npx --yes vercel env rm MONITOR_API_BASE_URL production --yes || true
-  printf '%s\n' "$backend_url" | npx --yes vercel env add MONITOR_API_BASE_URL production
-  npx --yes vercel deploy --prod --yes
+  vercel_args=(--yes)
+  if [[ -n "${VERCEL_TOKEN:-}" ]]; then
+    vercel_args+=(--token "$VERCEL_TOKEN")
+  fi
+
+  npx --yes vercel env rm MONITOR_API_BASE_URL production --yes "${vercel_args[@]}" || true
+  npx --yes vercel env add MONITOR_API_BASE_URL production --value "$backend_url" --yes --force --no-sensitive "${vercel_args[@]}"
+  npx --yes vercel deploy --prod --yes "${vercel_args[@]}"
   printf '%s' "$backend_url" > "$URL_FILE"
 fi
 
