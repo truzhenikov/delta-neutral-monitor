@@ -1,5 +1,5 @@
 [Unit]
-Description=Delta Neutral Monitor quick Cloudflare tunnel with Vercel sync
+Description=Delta Neutral Monitor quick Cloudflare tunnel with Vercel sync (legacy fallback)
 After=network-online.target delta-neutral-monitor-backend.service
 Wants=network-online.target
 Requires=delta-neutral-monitor-backend.service

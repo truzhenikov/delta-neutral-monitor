@@ -46,7 +46,7 @@ This is important for production use: **real stale data is always better than fa
 
 ```text
 src/                 FastAPI app, connectors, monitoring, Telegram bot
-webapp/              Next.js dashboard deployed on Vercel or run locally
+webapp/              Next.js dashboard for VPS hosting or optional Vercel frontend
 deploy/              Example systemd service units
 tests/               Backend tests
 docs/                Additional notes and deployment docs
@@ -151,33 +151,36 @@ History recording is intentionally conservative:
 Recommended production topology:
 
 - **backend on a VPS** under `systemd`
-- **public HTTP reverse proxy** (for example nginx) in front of the backend
-- **webapp on Vercel** with `MONITOR_API_BASE_URL` pointing at the VPS backend URL
+- **Next.js webapp on the same VPS** under `systemd`
+- **public nginx reverse proxy** in front of both services
+- optional **Vercel** only as a secondary frontend, not as the primary production path
 
-Use the sample service files in `deploy/`:
+Use the sample deploy files in `deploy/`:
 
 - `deploy/delta-neutral-monitor-backend.service`
 - `deploy/delta-neutral-monitor-history.service`
+- `deploy/delta-neutral-monitor-webapp.service`
+- `deploy/delta-neutral-monitor.nginx.conf`
 
 A detailed production walkthrough is in:
 
 - [`docs/self-hosting.md`](docs/self-hosting.md)
 
-## Frontend deployment (Vercel)
+## Frontend deployment (self-hosted recommended)
 
-The dashboard should call the real backend through `MONITOR_API_BASE_URL`.
+Recommended production path:
 
-Example production env var:
+- run `webapp/` on the same VPS via `deploy/delta-neutral-monitor-webapp.service`
+- proxy `/` and `/api/` through nginx to `127.0.0.1:3000`
+- proxy `/health` and `/v1/` through nginx to `127.0.0.1:8080`
 
-```bash
-MONITOR_API_BASE_URL=http://YOUR_SERVER_IP
-```
-
-The Next.js API routes in `webapp/app/api/*` are now strict proxies:
+The Next.js API routes in `webapp/app/api/*` are strict proxies:
 
 - they return live/stale backend data when the backend responds
 - they return `502` with an error payload when the backend is unavailable
 - they do **not** inject demo payloads
+
+If you still keep a Vercel frontend for convenience, treat it as optional and point `MONITOR_API_BASE_URL` at a stable VPS origin rather than a temporary tunnel.
 
 ## Tests
 
