@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -27,6 +28,8 @@ from src.deps import (
     get_status_service,
     get_telegram_preferences_service,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def render_status_text(status: dict) -> str:
@@ -80,6 +83,15 @@ def resolve_alert_chat_ids(preferences, bootstrap_chat_id: str = "") -> list[str
     return sorted(chat_ids)
 
 
+async def safe_send_message(bot: Any, chat_id: str, text: str, *, context: str) -> bool:
+    try:
+        await bot.send_message(chat_id=chat_id, text=text)
+    except Exception as exc:
+        logger.warning("telegram_send_failed context=%s chat_id=%s error=%s", context, chat_id, exc)
+        return False
+    return True
+
+
 async def send_alerts_for_snapshot(
     bot: Any,
     snapshot,
@@ -92,7 +104,7 @@ async def send_alerts_for_snapshot(
         return
     for chat_id in resolve_alert_chat_ids(preferences, bootstrap_chat_id=bootstrap_chat_id):
         for text in messages:
-            await bot.send_message(chat_id=chat_id, text=text)
+            await safe_send_message(bot, chat_id, text, context="alert")
 
 
 async def send_due_daily_reports(bot: Any, preferences, daily_report_service, now: datetime | None = None) -> None:
@@ -107,8 +119,9 @@ async def send_due_daily_reports(bot: Any, preferences, daily_report_service, no
         chat_settings = preferences.get_chat(chat_id)
         if not daily_report_service.should_send(chat_settings, effective_now):
             continue
-        await bot.send_message(chat_id=chat_id, text=text)
-        preferences.mark_daily_report_sent(chat_id, report_day_key)
+        sent = await safe_send_message(bot, chat_id, text, context="daily_report")
+        if sent:
+            preferences.mark_daily_report_sent(chat_id, report_day_key)
 
 
 async def alert_loop(bot: Bot, stop_event: asyncio.Event) -> None:

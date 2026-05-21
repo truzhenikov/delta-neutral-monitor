@@ -210,6 +210,24 @@ def test_send_due_daily_reports_sends_once_and_marks_sent(tmp_path: Path) -> Non
     assert prefs.get_chat("123")["last_daily_report_date"] == "2026-05-18"
 
 
+def test_send_due_daily_reports_does_not_mark_sent_on_send_failure(tmp_path: Path) -> None:
+    from src.bot.run import send_due_daily_reports
+    from src.services.daily_report_service import DailyReportService
+
+    history_service = build_history_service(tmp_path)
+    daily_service = DailyReportService(history_service=history_service)
+    prefs = TelegramPreferencesService(state_path=tmp_path / "telegram-state.json", admin_chat_ids=[], daily_report_hour_utc=7)
+    prefs.set_daily_report_enabled("123", True)
+    bot = AsyncMock()
+    bot.send_message.side_effect = TimeoutError("telegram timeout")
+    now = datetime(2026, 5, 18, 7, 5, tzinfo=timezone.utc)
+
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now))
+
+    assert bot.send_message.await_count == 1
+    assert prefs.get_chat("123").get("last_daily_report_date") is None
+
+
 def test_send_due_daily_reports_uses_business_day_key_for_report_selection_and_dedupe(tmp_path: Path) -> None:
     from src.bot.run import send_due_daily_reports
     from src.services.daily_report_service import DailyReportService
