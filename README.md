@@ -160,6 +160,7 @@ Use the sample deploy files in `deploy/`:
 - `deploy/delta-neutral-monitor-backend.service`
 - `deploy/delta-neutral-monitor-history.service`
 - `deploy/delta-neutral-monitor-webapp.service`
+- `deploy/delta-neutral-monitor-bot.service`
 - `deploy/delta-neutral-monitor.nginx.conf`
 
 A detailed production walkthrough is in:

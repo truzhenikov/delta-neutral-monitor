@@ -61,6 +61,7 @@ Copy the sample unit files:
 sudo cp deploy/delta-neutral-monitor-backend.service /etc/systemd/system/
 sudo cp deploy/delta-neutral-monitor-history.service /etc/systemd/system/
 sudo cp deploy/delta-neutral-monitor-webapp.service /etc/systemd/system/
+sudo cp deploy/delta-neutral-monitor-bot.service /etc/systemd/system/
 ```
 
 Reload systemd and enable the backend + frontend:
@@ -69,6 +70,7 @@ Reload systemd and enable the backend + frontend:
 sudo systemctl daemon-reload
 sudo systemctl enable --now delta-neutral-monitor-backend.service
 sudo systemctl enable --now delta-neutral-monitor-webapp.service
+sudo systemctl enable --now delta-neutral-monitor-bot.service
 ```
 
 Check status:
@@ -76,6 +78,7 @@ Check status:
 ```bash
 sudo systemctl status delta-neutral-monitor-backend.service --no-pager
 sudo systemctl status delta-neutral-monitor-webapp.service --no-pager
+sudo systemctl status delta-neutral-monitor-bot.service --no-pager
 ```
 
 ### History snapshots
