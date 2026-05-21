@@ -10,8 +10,8 @@ def render_portfolio_text(status: dict) -> str:
     down = [c["exchange"] for c in status.get("connector_statuses", []) if not c.get("ok")]
     connector_line = "Connectors: all ok" if not down else f"Connectors down: {', '.join(down)}"
 
-    top_accounts = sorted(status.get("accounts", []), key=lambda item: item.get("equity_usd", 0), reverse=True)
-    top_lines = [f"- {item['exchange'].title()}: {_fmt_usd(item['equity_usd'])}" for item in top_accounts[:5]]
+    accounts = sorted(status.get("accounts", []), key=lambda item: item.get("equity_usd", 0), reverse=True)
+    balance_lines = [f"- {item['exchange'].title()}: {_fmt_usd(item['equity_usd'])}" for item in accounts]
 
     return "\n".join(
         [
@@ -22,8 +22,8 @@ def render_portfolio_text(status: dict) -> str:
             f"Net delta: {_fmt_usd(risk['net_delta_usd'])}",
             f"Risk: {risk['risk_level']}",
             connector_line,
-            "Top balances:",
-            *top_lines,
+            "Balances by exchange:",
+            *balance_lines,
         ]
     )
 

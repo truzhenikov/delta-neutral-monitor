@@ -33,6 +33,58 @@ def sample_status() -> dict:
                 "updated_at": "2026-05-18T19:54:57Z",
                 "positions": [],
             },
+            {
+                "exchange": "bitget",
+                "equity_usd": 2800.12,
+                "available_margin_usd": 2100.0,
+                "maintenance_margin_usd": 240.0,
+                "position_count": 1,
+                "total_notional_usd": 5200.0,
+                "total_pnl_usd": 15.5,
+                "total_delta_usd": 5200.0,
+                "load_ratio": 0.09,
+                "updated_at": "2026-05-18T19:54:57Z",
+                "positions": [],
+            },
+            {
+                "exchange": "kucoin",
+                "equity_usd": 2300.34,
+                "available_margin_usd": 1900.0,
+                "maintenance_margin_usd": 180.0,
+                "position_count": 1,
+                "total_notional_usd": 4100.0,
+                "total_pnl_usd": -20.0,
+                "total_delta_usd": 4100.0,
+                "load_ratio": 0.08,
+                "updated_at": "2026-05-18T19:54:57Z",
+                "positions": [],
+            },
+            {
+                "exchange": "aden",
+                "equity_usd": 1800.56,
+                "available_margin_usd": 1500.0,
+                "maintenance_margin_usd": 120.0,
+                "position_count": 0,
+                "total_notional_usd": 0.0,
+                "total_pnl_usd": 0.0,
+                "total_delta_usd": 0.0,
+                "load_ratio": 0.0,
+                "updated_at": "2026-05-18T19:54:57Z",
+                "positions": [],
+            },
+            {
+                "exchange": "bingx",
+                "equity_usd": 1600.78,
+                "available_margin_usd": 1200.0,
+                "maintenance_margin_usd": 90.0,
+                "position_count": 1,
+                "total_notional_usd": 3000.0,
+                "total_pnl_usd": 5.0,
+                "total_delta_usd": 3000.0,
+                "load_ratio": 0.06,
+                "updated_at": "2026-05-18T19:54:57Z",
+                "positions": [],
+            },
         ],
         "connector_statuses": [
             {"exchange": "hyperliquid", "ok": True, "error": None, "updated_at": "2026-05-18T19:54:57Z"},
@@ -69,8 +121,13 @@ def test_render_portfolio_text_includes_core_totals_and_exchange_breakdown() -> 
     assert "-52.98 USD" in text
     assert "medium" in text
     assert "Connectors down: extended" in text
+    assert "Balances by exchange:" in text
     assert "Hyperliquid: 9,552.39 USD" in text
     assert "Extended: 8,046.41 USD" in text
+    assert "Bitget: 2,800.12 USD" in text
+    assert "Kucoin: 2,300.34 USD" in text
+    assert "Aden: 1,800.56 USD" in text
+    assert "Bingx: 1,600.78 USD" in text
 
 
 def test_render_daily_report_text_includes_previous_day_delta_and_percent() -> None:
