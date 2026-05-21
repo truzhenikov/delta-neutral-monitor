@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -141,3 +142,35 @@ def test_monitoring_service_caps_slow_connector_wait_and_reuses_cached_snapshot(
     assert second_accounts[0].updated_at == datetime(2026, 5, 19, 11, 0, tzinfo=timezone.utc)
     assert second_statuses[0].ok is False
     assert "timeout" in second_statuses[0].error.lower()
+
+
+def test_monitoring_service_reuses_live_snapshot_within_ttl(tmp_path: Path) -> None:
+    connector = SuccessThenFailConnector()
+    service = MonitoringService([connector], cache_path=tmp_path / "latest-accounts.json", cache_ttl_sec=300)
+
+    first_accounts, first_statuses = asyncio.run(service.collect_with_status())
+    second_accounts, second_statuses = asyncio.run(service.collect_with_status())
+
+    assert connector.calls == 1
+    assert [account.exchange for account in first_accounts] == ["okx"]
+    assert [account.exchange for account in second_accounts] == ["okx"]
+    assert first_accounts[0].equity_usd == 250.0
+    assert second_accounts[0].equity_usd == 250.0
+    assert first_statuses[0].ok is True
+    assert second_statuses[0].ok is True
+
+
+def test_monitoring_service_refreshes_after_ttl_expires(tmp_path: Path) -> None:
+    connector = SuccessThenFailConnector()
+    service = MonitoringService([connector], cache_path=tmp_path / "latest-accounts.json", cache_ttl_sec=0.01)
+
+    first_accounts, first_statuses = asyncio.run(service.collect_with_status())
+    time.sleep(0.02)
+    second_accounts, second_statuses = asyncio.run(service.collect_with_status())
+
+    assert connector.calls == 2
+    assert first_accounts[0].equity_usd == 250.0
+    assert second_accounts[0].equity_usd == 250.0
+    assert first_statuses[0].ok is True
+    assert second_statuses[0].ok is False
+    assert second_statuses[0].error == "timeout"

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -14,9 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class MonitoringService:
-    def __init__(self, connectors: list[ExchangeConnector], cache_path: Path | None = None) -> None:
+    def __init__(self, connectors: list[ExchangeConnector], cache_path: Path | None = None, cache_ttl_sec: float = 0.0) -> None:
         self.connectors = connectors
         self.cache_path = cache_path
+        self.cache_ttl_sec = max(float(cache_ttl_sec), 0.0)
+        self._result_cache: tuple[list[AccountSnapshot], list[ConnectorStatus]] | None = None
+        self._result_cache_expires_at = 0.0
 
     async def _fetch_with_retry(self, connector: ExchangeConnector) -> AccountSnapshot:
         try:
@@ -35,6 +39,9 @@ class MonitoringService:
     async def collect_with_status(self) -> tuple[list[AccountSnapshot], list[ConnectorStatus]]:
         if not self.connectors:
             return [], []
+        now = time.monotonic()
+        if self._result_cache is not None and now < self._result_cache_expires_at:
+            return self._result_cache
         timeout_sec = get_settings().request_timeout_sec
         results = await asyncio.gather(
             *(asyncio.wait_for(self._fetch_with_retry(c), timeout=timeout_sec) for c in self.connectors),
@@ -77,7 +84,11 @@ class MonitoringService:
         accounts = [accounts_by_exchange[status.exchange] for status in statuses if status.exchange in accounts_by_exchange]
         if live_accounts_seen:
             self._write_cached_accounts(accounts)
-        return accounts, statuses
+        result = (accounts, statuses)
+        if self.cache_ttl_sec > 0:
+            self._result_cache = result
+            self._result_cache_expires_at = time.monotonic() + self.cache_ttl_sec
+        return result
 
     def _read_cached_accounts(self) -> list[AccountSnapshot]:
         if self.cache_path is None or not self.cache_path.exists():

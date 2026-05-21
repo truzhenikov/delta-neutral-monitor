@@ -26,6 +26,7 @@ def get_monitoring_service() -> MonitoringService:
             use_mock_data=settings.use_mock_data,
         ),
         cache_path=history_storage_dir / "latest-accounts.json",
+        cache_ttl_sec=settings.status_cache_ttl_sec,
     )
 
 

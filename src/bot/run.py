@@ -107,14 +107,14 @@ async def send_alerts_for_snapshot(
             await safe_send_message(bot, chat_id, text, context="alert")
 
 
-async def send_due_daily_reports(bot: Any, preferences, daily_report_service, now: datetime | None = None) -> None:
+async def send_due_daily_reports(bot: Any, preferences, daily_report_service, status: dict | None = None, now: datetime | None = None) -> None:
     effective_now = now or datetime.now(timezone.utc)
     report_day_key = daily_report_service.report_day_key(effective_now)
     report = daily_report_service.build_report_for_date(date.fromisoformat(report_day_key))
     if report is None:
         return
     current, previous = report
-    text = build_daily_reply({"daily_changes": [current, previous]})
+    text = build_daily_reply({"daily_changes": [current, previous]}, status)
     for chat_id in preferences.list_daily_report_chat_ids():
         chat_settings = preferences.get_chat(chat_id)
         if not daily_report_service.should_send(chat_settings, effective_now):
@@ -151,9 +151,13 @@ async def daily_report_loop(bot: Bot, stop_event: asyncio.Event) -> None:
     settings = get_settings()
     preferences = get_telegram_preferences_service()
     daily_report_service = get_daily_report_service()
+    monitoring = get_monitoring_service()
+    status_service = get_status_service()
 
     while not stop_event.is_set():
-        await send_due_daily_reports(bot, preferences, daily_report_service)
+        accounts, connector_statuses = await monitoring.collect_with_status()
+        status = status_service.build_status(accounts, connector_statuses=connector_statuses).model_dump()
+        await send_due_daily_reports(bot, preferences, daily_report_service, status=status)
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=settings.alert_poll_interval_sec)
         except TimeoutError:
@@ -213,7 +217,8 @@ async def run_bot() -> None:
     async def daily_cmd(message: Message) -> None:
         history_service = get_history_service()
         history = history_service.build_history_response().model_dump(mode="json")
-        await message.answer(build_daily_reply(history))
+        status = await collect_status_snapshot()
+        await message.answer(build_daily_reply(history, status))
 
     @dp.message(Command("alerts"))
     async def alerts_cmd(message: Message) -> None:

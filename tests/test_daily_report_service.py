@@ -200,8 +200,8 @@ def test_send_due_daily_reports_sends_once_and_marks_sent(tmp_path: Path) -> Non
     bot = AsyncMock()
     now = datetime(2026, 5, 18, 7, 5, tzinfo=timezone.utc)
 
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now))
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
 
     sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
     assert len(sent_messages) == 1
@@ -222,7 +222,7 @@ def test_send_due_daily_reports_does_not_mark_sent_on_send_failure(tmp_path: Pat
     bot.send_message.side_effect = TimeoutError("telegram timeout")
     now = datetime(2026, 5, 18, 7, 5, tzinfo=timezone.utc)
 
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
 
     assert bot.send_message.await_count == 1
     assert prefs.get_chat("123").get("last_daily_report_date") is None
@@ -268,8 +268,8 @@ def test_send_due_daily_reports_uses_business_day_key_for_report_selection_and_d
     bot = AsyncMock()
     now = datetime(2026, 5, 19, 1, 5, tzinfo=timezone.utc)
 
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now))
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
 
     sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
     assert len(sent_messages) == 1

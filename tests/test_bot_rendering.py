@@ -122,12 +122,12 @@ def test_render_portfolio_text_includes_core_totals_and_exchange_breakdown() -> 
     assert "medium" in text
     assert "Connectors down: extended" in text
     assert "Balances by exchange:" in text
-    assert "Hyperliquid: 9,552.39 USD" in text
-    assert "Extended: 8,046.41 USD" in text
-    assert "Bitget: 2,800.12 USD" in text
-    assert "Kucoin: 2,300.34 USD" in text
-    assert "Aden: 1,800.56 USD" in text
-    assert "Bingx: 1,600.78 USD" in text
+    assert "Hyperliquid: 9,552.39 USD (real lev 7.20x)" in text
+    assert "Extended: 8,046.41 USD (real lev 3.09x)" in text
+    assert "Bitget: 2,800.12 USD (real lev 1.86x)" in text
+    assert "Kucoin: 2,300.34 USD (real lev 1.78x)" in text
+    assert "Aden: 1,800.56 USD (real lev 0.00x)" in text
+    assert "Bingx: 1,600.78 USD (real lev 1.87x)" in text
 
 
 def test_render_daily_report_text_includes_previous_day_delta_and_percent() -> None:

@@ -12,17 +12,18 @@ def build_portfolio_reply(status: dict) -> str:
     return render_portfolio_text(status)
 
 
-def build_daily_reply(history: dict) -> str:
+def build_daily_reply(history: dict, status: dict | None = None) -> str:
     daily_changes = history.get("daily_changes") or []
     if not daily_changes:
         return render_daily_report_text(
             {"date": "n/a", "equity_usd": 0.0, "warning_count": 0},
             None,
+            status,
         )
 
     current = daily_changes[0]
     previous = daily_changes[1] if len(daily_changes) > 1 else None
-    return render_daily_report_text(current, previous)
+    return render_daily_report_text(current, previous, status)
 
 
 def build_alert_settings_reply(preferences: TelegramPreferencesService, chat_id: str) -> str:
