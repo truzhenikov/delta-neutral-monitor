@@ -146,6 +146,30 @@ def test_render_daily_report_text_includes_previous_day_delta_and_percent() -> N
     assert "+2.00%" in text
 
 
+def test_render_daily_report_text_formats_copy_block_like_table_preview() -> None:
+    from src.bot.rendering import render_daily_report_text
+
+    current = {"date": "2026-05-18", "equity_usd": 42126.34, "warning_count": 1}
+    previous = {"date": "2026-05-17", "equity_usd": 41300.00, "warning_count": 0}
+    status = {
+        "accounts": [
+            {"exchange": "hyperliquid", "equity_usd": 9490.24},
+            {"exchange": "okx", "equity_usd": 8517.0},
+            {"exchange": "extended", "equity_usd": 8009.5},
+            {"exchange": "bingx", "equity_usd": 6466.1},
+            {"exchange": "bitget", "equity_usd": 4318.27},
+            {"exchange": "aden", "equity_usd": 2843.17},
+            {"exchange": "kucoin", "equity_usd": 2454.33},
+        ]
+    }
+
+    text = render_daily_report_text(current, previous, status)
+
+    assert "```" in text
+    assert "Hyperliquid  Okx      Extended  Bingx    Bitget   Aden     Kucoin   Total" in text
+    assert "9490.24      8517.00  8009.50   6466.10  4318.27  2843.17  2454.33  42098.61" in text
+
+
 def test_render_daily_report_text_handles_missing_previous_day() -> None:
     from src.bot.rendering import render_daily_report_text
 

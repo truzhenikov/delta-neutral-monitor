@@ -68,27 +68,28 @@ def test_build_daily_reply_uses_latest_two_days() -> None:
     assert "+826.34 USD" in text
 
 
-def test_build_daily_reply_includes_copy_friendly_exchange_header_and_values_rows() -> None:
+def test_build_daily_reply_includes_copy_block_as_monospace_table() -> None:
     from src.bot.command_logic import build_daily_reply
 
     status = {
         "accounts": [
-            {"exchange": "hyperliquid", "equity_usd": 12189.72},
-            {"exchange": "aden", "equity_usd": 2854.25},
-            {"exchange": "kucoin", "equity_usd": 3778.14},
-            {"exchange": "extended", "equity_usd": 8172.0},
-            {"exchange": "okx", "equity_usd": 6552.45},
-            {"exchange": "bitget", "equity_usd": 2617.85},
-            {"exchange": "bingx", "equity_usd": 6037.98},
+            {"exchange": "hyperliquid", "equity_usd": 9490.24},
+            {"exchange": "okx", "equity_usd": 8517.0},
+            {"exchange": "extended", "equity_usd": 8009.5},
+            {"exchange": "bingx", "equity_usd": 6466.1},
+            {"exchange": "bitget", "equity_usd": 4318.27},
+            {"exchange": "aden", "equity_usd": 2843.17},
+            {"exchange": "kucoin", "equity_usd": 2454.33},
         ]
     }
 
     text = build_daily_reply(sample_history(), status)
 
-    assert "HL\tAden\tKucoin\tExtended\tOKX\tBitget\tBingX" in text
-    assert "12189,72\t2854,25\t3778,14\t8172,00\t6552,45\t2617,85\t6037,98" in text
-    assert "Bitmart" not in text
-    assert "Excel row" not in text
+    assert "```" in text
+    assert "Hyperliquid  Okx      Extended  Bingx    Bitget   Aden     Kucoin   Total" in text
+    assert "9490.24      8517.00  8009.50   6466.10  4318.27  2843.17  2454.33  42098.61" in text
+    assert "HL\tAden\tKucoin" not in text
+    assert "12189,72" not in text
 
 
 def test_build_daily_reply_handles_missing_previous_day() -> None:

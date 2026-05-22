@@ -1,15 +1,6 @@
 from __future__ import annotations
 
-EXCEL_EXCHANGE_COLUMNS: list[tuple[str, str]] = [
-    ("hyperliquid", "HL"),
-    ("aden", "Aden"),
-    ("kucoin", "Kucoin"),
-    ("extended", "Extended"),
-    ("okx", "OKX"),
-    ("bitget", "Bitget"),
-    ("bingx", "BingX"),
-]
-
+COPY_BLOCK_TOTAL_LABEL = "Total"
 
 def _fmt_usd(value: float) -> str:
     return f"{value:,.2f} USD"
@@ -22,20 +13,36 @@ def _real_leverage(account: dict) -> float:
     return float(account.get("total_notional_usd") or 0.0) / equity
 
 
-def _fmt_excel_decimal(value: float) -> str:
-    return f"{value:.2f}".replace(".", ",")
+def _fmt_copy_block_decimal(value: float) -> str:
+    return f"{value:.2f}"
 
 
-def render_excel_exchange_header_row() -> str:
-    return "\t".join(label for _exchange, label in EXCEL_EXCHANGE_COLUMNS)
+def _copy_block_label(exchange: str) -> str:
+    return exchange.replace("_", " ").title()
 
 
-def render_excel_exchange_row(status: dict | None) -> str:
+def render_copy_block(status: dict | None) -> str:
     if not status:
         return ""
-    accounts = {str(item.get("exchange", "")).lower(): float(item.get("equity_usd") or 0.0) for item in status.get("accounts", [])}
-    ordered_values = [_fmt_excel_decimal(accounts.get(exchange, 0.0)) for exchange, _label in EXCEL_EXCHANGE_COLUMNS]
-    return "\t".join(ordered_values)
+
+    accounts = sorted(
+        status.get("accounts", []),
+        key=lambda item: float(item.get("equity_usd") or 0.0),
+        reverse=True,
+    )
+    if not accounts:
+        return ""
+
+    headers = [_copy_block_label(str(item.get("exchange", ""))) for item in accounts]
+    values = [_fmt_copy_block_decimal(float(item.get("equity_usd") or 0.0)) for item in accounts]
+    total_value = _fmt_copy_block_decimal(sum(float(item.get("equity_usd") or 0.0) for item in accounts))
+    headers.append(COPY_BLOCK_TOTAL_LABEL)
+    values.append(total_value)
+
+    widths = [max(len(header), len(value)) for header, value in zip(headers, values)]
+    header_row = "  ".join(header.ljust(width) for header, width in zip(headers, widths))
+    value_row = "  ".join(value.ljust(width) for value, width in zip(values, widths))
+    return f"```\n{header_row}\n{value_row}\n```"
 
 
 def render_portfolio_text(status: dict) -> str:
@@ -82,12 +89,11 @@ def render_daily_report_text(current: dict, previous: dict | None, status: dict 
             f"Change: {change:+,.2f} USD ({pct:+.2f}%)",
         ]
     )
-    excel_row = render_excel_exchange_row(status)
-    if excel_row:
+    copy_block = render_copy_block(status)
+    if copy_block:
         lines.extend([
             "",
-            render_excel_exchange_header_row(),
-            excel_row,
+            copy_block,
         ])
     return "\n".join(lines)
 
