@@ -165,7 +165,9 @@ def test_render_daily_report_text_formats_copy_block_like_table_preview() -> Non
 
     text = render_daily_report_text(current, previous, status)
 
-    assert "```" in text
+    assert "<pre>" in text
+    assert "</pre>" in text
+    assert "```" not in text
     assert "Hyperliquid  Okx      Extended  Bingx    Bitget   Aden     Kucoin   Total" in text
     assert "9490.24      8517.00  8009.50   6466.10  4318.27  2843.17  2454.33  42098.61" in text
 

@@ -83,9 +83,12 @@ def resolve_alert_chat_ids(preferences, bootstrap_chat_id: str = "") -> list[str
     return sorted(chat_ids)
 
 
-async def safe_send_message(bot: Any, chat_id: str, text: str, *, context: str) -> bool:
+async def safe_send_message(bot: Any, chat_id: str, text: str, *, context: str, parse_mode: str | None = None) -> bool:
     try:
-        await bot.send_message(chat_id=chat_id, text=text)
+        kwargs = {"chat_id": chat_id, "text": text}
+        if parse_mode is not None:
+            kwargs["parse_mode"] = parse_mode
+        await bot.send_message(**kwargs)
     except Exception as exc:
         logger.warning("telegram_send_failed context=%s chat_id=%s error=%s", context, chat_id, exc)
         return False
@@ -119,7 +122,7 @@ async def send_due_daily_reports(bot: Any, preferences, daily_report_service, st
         chat_settings = preferences.get_chat(chat_id)
         if not daily_report_service.should_send(chat_settings, effective_now):
             continue
-        sent = await safe_send_message(bot, chat_id, text, context="daily_report")
+        sent = await safe_send_message(bot, chat_id, text, context="daily_report", parse_mode="HTML")
         if sent:
             preferences.mark_daily_report_sent(chat_id, report_day_key)
 
@@ -218,7 +221,7 @@ async def run_bot() -> None:
         history_service = get_history_service()
         history = history_service.build_history_response().model_dump(mode="json")
         status = await collect_status_snapshot()
-        await message.answer(build_daily_reply(history, status))
+        await message.answer(build_daily_reply(history, status), parse_mode="HTML")
 
     @dp.message(Command("alerts"))
     async def alerts_cmd(message: Message) -> None:

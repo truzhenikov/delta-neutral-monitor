@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from html import escape
+
 COPY_BLOCK_TOTAL_LABEL = "Total"
 
 def _fmt_usd(value: float) -> str:
@@ -42,7 +44,8 @@ def render_copy_block(status: dict | None) -> str:
     widths = [max(len(header), len(value)) for header, value in zip(headers, values)]
     header_row = "  ".join(header.ljust(width) for header, width in zip(headers, widths))
     value_row = "  ".join(value.ljust(width) for value, width in zip(values, widths))
-    return f"```\n{header_row}\n{value_row}\n```"
+    block_text = f"{header_row}\n{value_row}"
+    return f"<pre>{escape(block_text)}</pre>"
 
 
 def render_portfolio_text(status: dict) -> str:

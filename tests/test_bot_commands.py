@@ -85,7 +85,9 @@ def test_build_daily_reply_includes_copy_block_as_monospace_table() -> None:
 
     text = build_daily_reply(sample_history(), status)
 
-    assert "```" in text
+    assert "<pre>" in text
+    assert "</pre>" in text
+    assert "```" not in text
     assert "Hyperliquid  Okx      Extended  Bingx    Bitget   Aden     Kucoin   Total" in text
     assert "9490.24      8517.00  8009.50   6466.10  4318.27  2843.17  2454.33  42098.61" in text
     assert "HL\tAden\tKucoin" not in text

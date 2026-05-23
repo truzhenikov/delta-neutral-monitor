@@ -207,6 +207,7 @@ def test_send_due_daily_reports_sends_once_and_marks_sent(tmp_path: Path) -> Non
     assert len(sent_messages) == 1
     assert sent_messages[0]["chat_id"] == "123"
     assert "Daily portfolio report" in sent_messages[0]["text"]
+    assert sent_messages[0]["parse_mode"] == "HTML"
     assert prefs.get_chat("123")["last_daily_report_date"] == "2026-05-18"
 
 
