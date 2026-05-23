@@ -108,3 +108,25 @@ def test_send_alerts_for_snapshot_swallows_send_failures(tmp_path: Path) -> None
     asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
 
     assert bot.send_message.await_count > 0
+
+
+def test_failed_alert_delivery_does_not_consume_cooldown(tmp_path: Path) -> None:
+    from src.bot.run import send_alerts_for_snapshot
+
+    bot = AsyncMock()
+    bot.send_message.side_effect = [
+        TimeoutError("telegram timeout"),
+        TimeoutError("telegram timeout"),
+        None,
+        None,
+    ]
+    prefs = TelegramPreferencesService(state_path=tmp_path / "state.json", admin_chat_ids=[])
+    prefs.set_alerts_enabled("111", True)
+    alerting = AlertingService(cooldown_sec=300)
+    status = build_status()
+
+    asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
+    asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
+
+    sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
+    assert len(sent_messages) == 4
