@@ -25,6 +25,12 @@ def test_build_connectors_includes_hyperliquid_real() -> None:
     assert connectors[0].exchange == "hyperliquid"
 
 
+def test_build_connectors_supports_profiled_exchange_aliases() -> None:
+    connectors = build_connectors(["hyperliquid:main", "hyperliquid:alt"], use_mock_data=False)
+
+    assert [connector.exchange for connector in connectors] == ["hyperliquid:main", "hyperliquid:alt"]
+
+
 def test_hyperliquid_real_connector_requires_user_address(monkeypatch) -> None:
     from src.config import get_settings
 

@@ -11,6 +11,7 @@ Validator = Callable[[dict[str, str]], Awaitable[str]]
 class CredentialValidationResult:
     ok: bool
     message: str
+    checked: bool = True
 
 
 class CredentialValidationService:
@@ -23,14 +24,20 @@ class CredentialValidationService:
         if validator is None:
             return CredentialValidationResult(ok=False, message=f"Unsupported exchange for validation: {exchange}")
         try:
-            message = await validator(dict(payload))
+            result = await validator(dict(payload))
         except Exception as exc:  # pragma: no cover - defensive boundary
             return CredentialValidationResult(ok=False, message=f"Validation failed: {exc}")
-        return CredentialValidationResult(ok=True, message=message)
+        if isinstance(result, CredentialValidationResult):
+            return result
+        return CredentialValidationResult(ok=True, message=str(result))
 
 
 def build_default_credential_validation_service(supported_exchanges: list[str]) -> CredentialValidationService:
-    async def _placeholder(_: dict[str, str]) -> str:
-        return "Проверка учетных данных пока не настроена; данные сохранены."
+    async def _placeholder(_: dict[str, str]) -> CredentialValidationResult:
+        return CredentialValidationResult(
+            ok=True,
+            checked=False,
+            message="Проверка учетных данных не выполнялась; данные сохранены.",
+        )
 
     return CredentialValidationService(validators={exchange: _placeholder for exchange in supported_exchanges})

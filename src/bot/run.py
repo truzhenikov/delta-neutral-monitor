@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import httpx
 import logging
+import time
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +17,12 @@ from src.bot.command_logic import (
     build_portfolio_reply,
     toggle_alerts,
     toggle_daily_reports,
+)
+from src.bot.keyboards import (
+    build_remove_exchange_keyboard,
+    build_setup_exchange_keyboard,
+    parse_remove_exchange_callback,
+    parse_setup_exchange_callback,
 )
 from src.bot.setup_flow import TelegramSetupFlow
 from src.config import get_settings
@@ -141,10 +148,37 @@ async def send_due_daily_reports(bot: Any, preferences, daily_report_service, st
             preferences.mark_daily_report_sent(chat_id, report_day_key)
 
 
+async def send_heartbeat_if_due(
+    bot: Any,
+    preferences,
+    *,
+    bootstrap_chat_id: str = "",
+    heartbeat_interval_sec: int = 3600,
+    last_heartbeat_at: float | None,
+    now_monotonic: float | None = None,
+) -> float | None:
+    if heartbeat_interval_sec <= 0:
+        return last_heartbeat_at
+    current_monotonic = time.monotonic() if now_monotonic is None else now_monotonic
+    if last_heartbeat_at is None:
+        return current_monotonic
+    if current_monotonic - last_heartbeat_at < heartbeat_interval_sec:
+        return last_heartbeat_at
+
+    chat_ids = resolve_alert_chat_ids(preferences, bootstrap_chat_id=bootstrap_chat_id)
+    delivered = False
+    heartbeat_text = f"HEARTBEAT: bot is running ({datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')})"
+    for chat_id in chat_ids:
+        sent = await safe_send_message(bot, chat_id, heartbeat_text, context="heartbeat")
+        delivered = delivered or sent
+    return current_monotonic if delivered else last_heartbeat_at
+
+
 async def alert_loop(bot: Bot, stop_event: asyncio.Event) -> None:
     settings = get_settings()
     alerting_service = get_alerting_service()
     preferences = get_telegram_preferences_service()
+    last_heartbeat_at: float | None = None
 
     while not stop_event.is_set():
         try:
@@ -155,6 +189,13 @@ async def alert_loop(bot: Bot, stop_event: asyncio.Event) -> None:
                 preferences,
                 alerting_service,
                 bootstrap_chat_id=settings.telegram_alert_chat_id,
+            )
+            last_heartbeat_at = await send_heartbeat_if_due(
+                bot,
+                preferences,
+                bootstrap_chat_id=settings.telegram_alert_chat_id,
+                heartbeat_interval_sec=getattr(settings, "heartbeat_interval_sec", 3600),
+                last_heartbeat_at=last_heartbeat_at,
             )
         except Exception as exc:
             logger.warning("alert_loop_iteration_failed error=%s", exc)
@@ -182,9 +223,9 @@ async def daily_report_loop(bot: Bot, stop_event: asyncio.Event) -> None:
 
 
 async def run_bot() -> None:
-    from aiogram import Bot, Dispatcher
+    from aiogram import Bot, Dispatcher, F
     from aiogram.filters import Command
-    from aiogram.types import Message
+    from aiogram.types import CallbackQuery, Message
 
     settings = get_settings()
     if not settings.telegram_bot_token:
@@ -201,7 +242,7 @@ async def run_bot() -> None:
     @dp.message(Command("start"))
     async def start_cmd(message: Message) -> None:
         await message.answer(
-            "Delta Neutral Monitor bot is running. Commands: /status /portfolio /risk /positions /daily /alerts /alerts_on /alerts_off /daily_on /daily_off /setup /exchanges /remove_exchange /cancel"
+            "Delta Neutral Monitor bot is running. Commands: /status /portfolio /risk /positions /daily /alerts /alerts_on /alerts_off /daily_on /daily_off /setup [exchange] /exchanges /enable_exchange /disable_exchange /remove_exchange /cancel"
         )
 
     @dp.message(Command("status"))
@@ -258,7 +299,31 @@ async def run_bot() -> None:
 
     @dp.message(Command("setup"))
     async def setup_cmd(message: Message) -> None:
-        await message.answer(setup_flow.start_setup(str(message.chat.id)))
+        command_text = message.text or "/setup"
+        reply = setup_flow.start_setup(str(message.chat.id), command_text)
+        if len(command_text.strip().split(maxsplit=1)) == 1 and reply.startswith("Выберите биржу"):
+            await message.answer(reply, reply_markup=build_setup_exchange_keyboard())
+            return
+        await message.answer(reply)
+
+    @dp.callback_query(F.data.startswith("setup_exchange:"))
+    async def setup_exchange_callback(callback: CallbackQuery) -> None:
+        exchange = parse_setup_exchange_callback(callback.data)
+        if exchange is None:
+            await callback.answer("Некорректный выбор биржи.")
+            return
+        reply = setup_flow.select_exchange(str(callback.message.chat.id), exchange)
+        if callback.message is not None:
+            await callback.message.answer(reply)
+        await callback.answer()
+
+    @dp.message(Command("enable_exchange"))
+    async def enable_exchange_cmd(message: Message) -> None:
+        await message.answer(setup_flow.enable_exchange(str(message.chat.id), message.text or ""))
+
+    @dp.message(Command("disable_exchange"))
+    async def disable_exchange_cmd(message: Message) -> None:
+        await message.answer(setup_flow.disable_exchange(str(message.chat.id), message.text or ""))
 
     @dp.message(Command("exchanges"))
     async def exchanges_cmd(message: Message) -> None:
@@ -266,7 +331,28 @@ async def run_bot() -> None:
 
     @dp.message(Command("remove_exchange"))
     async def remove_exchange_cmd(message: Message) -> None:
-        await message.answer(setup_flow.remove_exchange(str(message.chat.id), message.text or ""))
+        command_text = message.text or "/remove_exchange"
+        reply = setup_flow.remove_exchange(str(message.chat.id), command_text)
+        if len(command_text.strip().split(maxsplit=1)) == 1 and reply.startswith("Выберите профиль"):
+            await message.answer(reply, reply_markup=build_remove_exchange_keyboard(get_credential_store()))
+            return
+        await message.answer(reply)
+
+    @dp.callback_query(F.data.startswith("remove_exchange:"))
+    async def remove_exchange_callback(callback: CallbackQuery) -> None:
+        exchange = parse_remove_exchange_callback(callback.data)
+        if exchange is None:
+            await callback.answer("Некорректный выбор профиля.")
+            return
+        if exchange == "cancel":
+            if callback.message is not None:
+                await callback.message.answer("Удаление профиля отменено.")
+            await callback.answer()
+            return
+        reply = setup_flow.remove_exchange(str(callback.message.chat.id), f"/remove_exchange {exchange}")
+        if callback.message is not None:
+            await callback.message.answer(reply)
+        await callback.answer()
 
     @dp.message(Command("cancel"))
     async def cancel_cmd(message: Message) -> None:

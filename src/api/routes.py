@@ -8,12 +8,13 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from src.config import get_settings
-from src.deps import get_history_service, get_monitoring_service, get_status_service
+from src.deps import get_credential_store, get_history_service, get_monitoring_service, get_status_service
 
 router = APIRouter()
 _status_cache_lock = asyncio.Lock()
 _status_cache_payload: dict | None = None
 _status_cache_expires_at = 0.0
+_status_cache_key = ""
 
 
 @router.get("/health")
@@ -23,14 +24,28 @@ async def health() -> dict[str, str]:
 
 @router.get("/v1/status")
 async def status() -> dict:
-    global _status_cache_payload, _status_cache_expires_at
+    global _status_cache_key, _status_cache_payload, _status_cache_expires_at
+
+    settings = get_settings()
+    credential_store = get_credential_store()
+    default_exchanges = getattr(settings, "exchanges", [])
+    exchanges = credential_store.list_enabled_exchanges(default=default_exchanges)
+    cache_key = f"{credential_store.get_state_revision()}:{','.join(exchanges)}"
 
     now = time.monotonic()
+    if _status_cache_key != cache_key:
+        _status_cache_payload = None
+        _status_cache_expires_at = 0.0
+        _status_cache_key = cache_key
     if _status_cache_payload is not None and now < _status_cache_expires_at:
         return _status_cache_payload
 
     async with _status_cache_lock:
         now = time.monotonic()
+        if _status_cache_key != cache_key:
+            _status_cache_payload = None
+            _status_cache_expires_at = 0.0
+            _status_cache_key = cache_key
         if _status_cache_payload is not None and now < _status_cache_expires_at:
             return _status_cache_payload
 
@@ -40,7 +55,7 @@ async def status() -> dict:
         snapshot = status_service.build_status(accounts, connector_statuses=connector_statuses)
         payload = snapshot.model_dump()
         _status_cache_payload = payload
-        _status_cache_expires_at = now + get_settings().status_cache_ttl_sec
+        _status_cache_expires_at = now + settings.status_cache_ttl_sec
         return payload
 
 

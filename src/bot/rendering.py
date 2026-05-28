@@ -15,6 +15,14 @@ def _real_leverage(account: dict) -> float:
     return float(account.get("total_notional_usd") or 0.0) / equity
 
 
+def _portfolio_real_leverage(status: dict) -> float:
+    equity = float(status.get("total_equity_usd") or 0.0)
+    if equity == 0:
+        return 0.0
+    total_notional = sum(float(item.get("total_notional_usd") or 0.0) for item in status.get("accounts", []))
+    return total_notional / equity
+
+
 def _fmt_copy_block_decimal(value: float) -> str:
     return f"{value:.2f}"
 
@@ -67,6 +75,7 @@ def render_portfolio_text(status: dict) -> str:
             f"Maintenance margin: {_fmt_usd(status['total_maintenance_margin_usd'])}",
             f"Net delta: {_fmt_usd(risk['net_delta_usd'])}",
             f"Risk: {risk['risk_level']}",
+            f"Real leverage: {_portfolio_real_leverage(status):.2f}x",
             connector_line,
             "Balances by exchange:",
             *balance_lines,

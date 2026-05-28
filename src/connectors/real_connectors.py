@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
@@ -14,6 +15,7 @@ import httpx
 from src.config import get_settings
 from src.connectors.base import ExchangeConnector
 from src.core.models import AccountSnapshot, Position, utc_now
+from src.services.credential_store import CredentialStore
 
 
 class RealConnectorNotConfiguredError(RuntimeError):
@@ -22,6 +24,12 @@ class RealConnectorNotConfiguredError(RuntimeError):
 
 class RealConnectorRequestError(RuntimeError):
     pass
+
+
+def _runtime_credentials(exchange: str) -> dict[str, str]:
+    settings = get_settings()
+    store = CredentialStore(Path(settings.credential_store_path))
+    return store.get_exchange_credentials(exchange)
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -206,7 +214,11 @@ class BitgetRealConnector(_BaseRealConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
-        if not (settings.bitget_api_key and settings.bitget_api_secret and settings.bitget_api_passphrase):
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.bitget_api_key
+        api_secret = credentials.get("api_secret") or settings.bitget_api_secret
+        api_passphrase = credentials.get("api_passphrase") or settings.bitget_api_passphrase
+        if not (api_key and api_secret and api_passphrase):
             raise RealConnectorNotConfiguredError(
                 "bitget credentials are not configured (BITGET_API_KEY/SECRET/PASSPHRASE)"
             )
@@ -214,9 +226,9 @@ class BitgetRealConnector(_BaseRealConnector):
         params = {"productType": settings.bitget_product_type}
         account_path = "/api/v2/mix/account/accounts"
         account_headers = self._build_signed_headers(
-            api_key=settings.bitget_api_key,
-            api_secret=settings.bitget_api_secret,
-            passphrase=settings.bitget_api_passphrase,
+            api_key=api_key,
+            api_secret=api_secret,
+            passphrase=api_passphrase,
             method="GET",
             path=account_path,
             params=params,
@@ -248,9 +260,9 @@ class BitgetRealConnector(_BaseRealConnector):
         }
         pos_path = "/api/v2/mix/position/all-position"
         pos_headers = self._build_signed_headers(
-            api_key=settings.bitget_api_key,
-            api_secret=settings.bitget_api_secret,
-            passphrase=settings.bitget_api_passphrase,
+            api_key=api_key,
+            api_secret=api_secret,
+            passphrase=api_passphrase,
             method="GET",
             path=pos_path,
             params=pos_params,
@@ -323,7 +335,10 @@ class BingxRealConnector(_BaseRealConnector):
 
     def _build_signed_params(self, params: dict[str, Any] | None = None) -> tuple[dict[str, Any], dict[str, str]]:
         settings = get_settings()
-        if not (settings.bingx_api_key and settings.bingx_api_secret):
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.bingx_api_key
+        api_secret = credentials.get("api_secret") or settings.bingx_api_secret
+        if not (api_key and api_secret):
             raise RealConnectorNotConfiguredError(
                 "bingx credentials are not configured (BINGX_API_KEY/SECRET)"
             )
@@ -333,10 +348,10 @@ class BingxRealConnector(_BaseRealConnector):
             signed_params.update(params)
         query = urlencode(sorted(signed_params.items()))
         signature = hmac.new(
-            settings.bingx_api_secret.encode("utf-8"), query.encode("utf-8"), hashlib.sha256
+            api_secret.encode("utf-8"), query.encode("utf-8"), hashlib.sha256
         ).hexdigest()
         signed_params["signature"] = signature
-        headers = {"X-BX-APIKEY": settings.bingx_api_key}
+        headers = {"X-BX-APIKEY": api_key}
         return signed_params, headers
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
@@ -424,13 +439,16 @@ class AdenRealConnector(_BaseRealConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
-        if not (settings.aden_api_key and settings.aden_api_secret):
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.aden_api_key
+        api_secret = credentials.get("api_secret") or settings.aden_api_secret
+        if not (api_key and api_secret):
             raise RealConnectorNotConfiguredError("aden credentials are not configured (ADEN_API_KEY/SECRET)")
 
         account_path = f"{settings.aden_api_prefix}/dex_futures/usdt/accounts"
         account_headers = self._build_signed_headers(
-            api_key=settings.aden_api_key,
-            api_secret=settings.aden_api_secret,
+            api_key=api_key,
+            api_secret=api_secret,
             method="GET",
             path="/dex_futures/usdt/accounts",
         )
@@ -444,8 +462,8 @@ class AdenRealConnector(_BaseRealConnector):
 
         positions_path = f"{settings.aden_api_prefix}/dex_futures/usdt/positions"
         positions_headers = self._build_signed_headers(
-            api_key=settings.aden_api_key,
-            api_secret=settings.aden_api_secret,
+            api_key=api_key,
+            api_secret=api_secret,
             method="GET",
             path="/dex_futures/usdt/positions",
         )
@@ -512,8 +530,10 @@ class HyperliquidRealConnector(_BaseRealConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
-        user = settings.hyperliquid_user_address.strip()
-        dexes = [part.strip() for part in settings.hyperliquid_dex.split(",") if part.strip()]
+        credentials = _runtime_credentials(self.exchange)
+        user = (credentials.get("user_address") or settings.hyperliquid_user_address).strip()
+        dex_raw = credentials.get("dex") or settings.hyperliquid_dex
+        dexes = [part.strip() for part in dex_raw.split(",") if part.strip()]
         if not dexes:
             dexes = [""]
         if not user:
@@ -645,12 +665,14 @@ class ExtendedRealConnector(_BaseRealConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
-        if not settings.extended_api_key:
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.extended_api_key
+        if not api_key:
             raise RealConnectorNotConfiguredError(
                 "extended credentials are not configured (EXTENDED_API_KEY)"
             )
 
-        headers = {"X-Api-Key": settings.extended_api_key}
+        headers = {"X-Api-Key": api_key}
 
         account_payload = await self._get(
             base_url=settings.extended_api_base,
@@ -761,16 +783,20 @@ class OkxRealConnector(_BaseRealConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
-        if not (settings.okx_api_key and settings.okx_api_secret and settings.okx_api_passphrase):
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.okx_api_key
+        api_secret = credentials.get("api_secret") or settings.okx_api_secret
+        api_passphrase = credentials.get("api_passphrase") or settings.okx_api_passphrase
+        if not (api_key and api_secret and api_passphrase):
             raise RealConnectorNotConfiguredError(
                 "okx credentials are not configured (OKX_API_KEY/SECRET/PASSPHRASE)"
             )
 
         balance_path = "/api/v5/account/balance"
         balance_headers = self._build_okx_headers(
-            api_key=settings.okx_api_key,
-            api_secret=settings.okx_api_secret,
-            passphrase=settings.okx_api_passphrase,
+            api_key=api_key,
+            api_secret=api_secret,
+            passphrase=api_passphrase,
             method="GET",
             path_with_query=balance_path,
         )
@@ -790,9 +816,9 @@ class OkxRealConnector(_BaseRealConnector):
         pos_path = "/api/v5/account/positions"
         pos_path_with_query = f"{pos_path}?{pos_query}"
         pos_headers = self._build_okx_headers(
-            api_key=settings.okx_api_key,
-            api_secret=settings.okx_api_secret,
-            passphrase=settings.okx_api_passphrase,
+            api_key=api_key,
+            api_secret=api_secret,
+            passphrase=api_passphrase,
             method="GET",
             path_with_query=pos_path_with_query,
         )
@@ -891,7 +917,11 @@ class KucoinRealConnector(_BaseRealConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
-        if not (settings.kucoin_api_key and settings.kucoin_api_secret and settings.kucoin_api_passphrase):
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.kucoin_api_key
+        api_secret = credentials.get("api_secret") or settings.kucoin_api_secret
+        api_passphrase = credentials.get("api_passphrase") or settings.kucoin_api_passphrase
+        if not (api_key and api_secret and api_passphrase):
             raise RealConnectorNotConfiguredError(
                 "kucoin credentials are not configured (KUCOIN_API_KEY/SECRET/PASSPHRASE)"
             )
@@ -899,9 +929,9 @@ class KucoinRealConnector(_BaseRealConnector):
         account_params = {"currency": "USDT"}
         account_path = "/api/v1/account-overview"
         account_headers = self._build_kucoin_headers(
-            api_key=settings.kucoin_api_key,
-            api_secret=settings.kucoin_api_secret,
-            passphrase=settings.kucoin_api_passphrase,
+            api_key=api_key,
+            api_secret=api_secret,
+            passphrase=api_passphrase,
             method="GET",
             path=account_path,
             params=account_params,
@@ -917,9 +947,9 @@ class KucoinRealConnector(_BaseRealConnector):
 
         positions_path = "/api/v1/positions"
         positions_headers = self._build_kucoin_headers(
-            api_key=settings.kucoin_api_key,
-            api_secret=settings.kucoin_api_secret,
-            passphrase=settings.kucoin_api_passphrase,
+            api_key=api_key,
+            api_secret=api_secret,
+            passphrase=api_passphrase,
             method="GET",
             path=positions_path,
         )

@@ -21,6 +21,7 @@ from src.connectors.real_connectors import (
     MexcRealConnector,
     OkxRealConnector,
 )
+from src.services.credential_store import CredentialStore
 
 MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenConnector,
@@ -48,8 +49,14 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
 def build_connectors(exchanges: list[str], use_mock_data: bool = False) -> list[ExchangeConnector]:
     connector_map = MOCK_CONNECTOR_MAP if use_mock_data else REAL_CONNECTOR_MAP
     connectors: list[ExchangeConnector] = []
-    for exch in exchanges:
-        if exch not in connector_map:
+    for exchange_ref in exchanges:
+        try:
+            base_exchange = CredentialStore.get_base_exchange(exchange_ref)
+        except ValueError:
             continue
-        connectors.append(connector_map[exch]())
+        if base_exchange not in connector_map:
+            continue
+        connector = connector_map[base_exchange]()
+        connector.exchange = CredentialStore.normalize_exchange_ref(exchange_ref)
+        connectors.append(connector)
     return connectors

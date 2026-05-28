@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     status_cache_ttl_sec: float = Field(default=300.0, alias="STATUS_CACHE_TTL_SEC")
     alert_poll_interval_sec: int = Field(default=300, alias="ALERT_POLL_INTERVAL_SEC")
     alert_cooldown_sec: int = Field(default=300, alias="ALERT_COOLDOWN_SEC")
+    heartbeat_interval_sec: int = Field(default=3600, alias="HEARTBEAT_INTERVAL_SEC")
 
     enabled_exchanges: str = Field(
         default="bitget,bingx,mexc,hyperliquid,extended,okx,kucoin,aden", alias="ENABLED_EXCHANGES"

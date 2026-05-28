@@ -189,3 +189,71 @@ def test_alert_loop_retries_after_backend_timeout(monkeypatch: pytest.MonkeyPatc
     sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
     assert len(sent_messages) == 1
     assert sent_messages[0]["chat_id"] == "111"
+
+
+def test_alerting_service_skips_not_configured_connector_alerts() -> None:
+    status = StatusOut.model_validate(
+        {
+            **build_status().model_dump(mode="json"),
+            "connector_statuses": [
+                {
+                    "exchange": "bitget",
+                    "ok": False,
+                    "error": "bitget credentials are not configured (BITGET_API_KEY/SECRET/PASSPHRASE)",
+                    "updated_at": datetime(2026, 5, 18, 20, 0, tzinfo=timezone.utc),
+                }
+            ],
+        }
+    )
+
+    alerts = AlertingService(cooldown_sec=0).collect_pending_alerts(status)
+
+    assert all("not configured" not in alert.text.lower() for alert in alerts)
+    assert all(not alert.text.startswith("CONNECTOR ALERT") for alert in alerts)
+
+
+def test_send_heartbeat_if_due_sends_hourly_heartbeat(tmp_path: Path) -> None:
+    from src.bot import run
+
+    bot = AsyncMock()
+    prefs = TelegramPreferencesService(state_path=tmp_path / "state.json", admin_chat_ids=[])
+    prefs.set_alerts_enabled("111", True)
+
+    last_heartbeat_at = asyncio.run(
+        run.send_heartbeat_if_due(
+            bot,
+            prefs,
+            heartbeat_interval_sec=3600,
+            last_heartbeat_at=None,
+            now_monotonic=0.0,
+        )
+    )
+    assert last_heartbeat_at == 0.0
+    assert bot.send_message.await_count == 0
+
+    last_heartbeat_at = asyncio.run(
+        run.send_heartbeat_if_due(
+            bot,
+            prefs,
+            heartbeat_interval_sec=3600,
+            last_heartbeat_at=last_heartbeat_at,
+            now_monotonic=1800.0,
+        )
+    )
+    assert last_heartbeat_at == 0.0
+    assert bot.send_message.await_count == 0
+
+    last_heartbeat_at = asyncio.run(
+        run.send_heartbeat_if_due(
+            bot,
+            prefs,
+            heartbeat_interval_sec=3600,
+            last_heartbeat_at=last_heartbeat_at,
+            now_monotonic=3601.0,
+        )
+    )
+
+    sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
+    assert last_heartbeat_at == 3601.0
+    assert any(message["text"].startswith("HEARTBEAT:") for message in sent_messages)
+    assert any(message["chat_id"] == "111" for message in sent_messages)

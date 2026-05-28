@@ -32,11 +32,18 @@ class AlertingService:
         for conn in status.connector_statuses:
             if conn.ok:
                 continue
-            key = f"connector:{conn.exchange}:{conn.error}"
+            error_text = (conn.error or "").strip()
+            if self._should_skip_connector_alert(error_text):
+                continue
+            key = f"connector:{conn.exchange}:{error_text}"
             if self._is_due(key, now):
-                messages.append(AlertMessage(key=key, text=f"CONNECTOR ALERT [{conn.exchange}]: {conn.error}"))
+                messages.append(AlertMessage(key=key, text=f"CONNECTOR ALERT [{conn.exchange}]: {error_text}"))
 
         return messages
+
+    def _should_skip_connector_alert(self, error_text: str) -> bool:
+        normalized = error_text.lower()
+        return "not configured" in normalized or "credentials are not configured" in normalized
 
     def mark_sent(self, key: str, sent_at: datetime | None = None) -> None:
         self._last_sent_at[key] = sent_at or datetime.now(timezone.utc)

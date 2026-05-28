@@ -9,8 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> int:
-    get_monitoring_service.cache_clear()
-    get_status_service.cache_clear()
+    if hasattr(get_monitoring_service, "cache_clear"):
+        get_monitoring_service.cache_clear()
+    if hasattr(get_status_service, "cache_clear"):
+        get_status_service.cache_clear()
 
     monitoring = get_monitoring_service()
     status_service = get_status_service()

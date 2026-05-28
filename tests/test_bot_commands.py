@@ -9,8 +9,8 @@ def sample_status() -> dict:
         "total_available_margin_usd": 16172.42,
         "total_maintenance_margin_usd": 6536.58,
         "accounts": [
-            {"exchange": "hyperliquid", "equity_usd": 9552.39, "positions": []},
-            {"exchange": "extended", "equity_usd": 8046.41, "positions": []},
+            {"exchange": "hyperliquid", "equity_usd": 9552.39, "total_notional_usd": 12000.0, "positions": []},
+            {"exchange": "extended", "equity_usd": 8046.41, "total_notional_usd": 8000.0, "positions": []},
         ],
         "connector_statuses": [
             {"exchange": "hyperliquid", "ok": True, "error": None},
@@ -54,6 +54,9 @@ def test_build_portfolio_reply_uses_renderer_output() -> None:
 
     assert "Portfolio summary" in text
     assert "42,126.34 USD" in text
+    assert "Real leverage: 0.47x" in text
+    assert "Hyperliquid: 9,552.39 USD (real lev 1.26x)" in text
+    assert "Extended: 8,046.41 USD (real lev 0.99x)" in text
     assert "Connectors down: extended" in text
 
 
