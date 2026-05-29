@@ -19,8 +19,12 @@ from src.bot.command_logic import (
     toggle_daily_reports,
 )
 from src.bot.keyboards import (
+    build_exchange_toggle_keyboard,
+    build_main_menu_keyboard,
     build_remove_exchange_keyboard,
     build_setup_exchange_keyboard,
+    parse_exchange_toggle_callback,
+    parse_main_menu_button,
     parse_remove_exchange_callback,
     parse_setup_exchange_callback,
 )
@@ -239,72 +243,133 @@ async def run_bot() -> None:
         validation_service=get_credential_validation_service(),
     )
 
-    @dp.message(Command("start"))
-    async def start_cmd(message: Message) -> None:
+    async def show_main_menu(message: Message) -> None:
+        preferences = get_telegram_preferences_service()
+        include_admin = preferences.is_admin(str(message.chat.id))
         await message.answer(
-            "Delta Neutral Monitor bot is running. Commands: /status /portfolio /risk /positions /daily /alerts /alerts_on /alerts_off /daily_on /daily_off /setup [exchange] /exchanges /enable_exchange /disable_exchange /remove_exchange /cancel"
+            "Бот запущен. Можно использовать команды или кнопки меню ниже.",
+            reply_markup=build_main_menu_keyboard(include_admin=include_admin),
         )
 
-    @dp.message(Command("status"))
-    async def status_cmd(message: Message) -> None:
+    async def send_status_reply(message: Message) -> None:
         snapshot = await collect_status_snapshot()
         await message.answer(render_status_text(snapshot))
 
-    @dp.message(Command("portfolio"))
-    async def portfolio_cmd(message: Message) -> None:
+    async def send_portfolio_reply(message: Message) -> None:
         snapshot = await collect_status_snapshot()
         await message.answer(build_portfolio_reply(snapshot))
 
-    @dp.message(Command("risk"))
-    async def risk_cmd(message: Message) -> None:
+    async def send_risk_reply(message: Message) -> None:
         snapshot = await collect_status_snapshot()
         await message.answer(render_risk_text(snapshot))
 
-    @dp.message(Command("positions"))
-    async def positions_cmd(message: Message) -> None:
+    async def send_positions_reply(message: Message) -> None:
         snapshot = await collect_status_snapshot()
         await message.answer(render_positions_text(snapshot))
 
-    @dp.message(Command("daily"))
-    async def daily_cmd(message: Message) -> None:
+    async def send_daily_reply(message: Message) -> None:
         history_service = get_history_service()
         history = history_service.build_history_response().model_dump(mode="json")
         status = await collect_status_snapshot()
         await message.answer(build_daily_reply(history, status), parse_mode="HTML")
 
-    @dp.message(Command("alerts"))
-    async def alerts_cmd(message: Message) -> None:
+    async def send_alert_settings_reply(message: Message) -> None:
         preferences = get_telegram_preferences_service()
         await message.answer(build_alert_settings_reply(preferences, str(message.chat.id)))
 
-    @dp.message(Command("alerts_on"))
-    async def alerts_on_cmd(message: Message) -> None:
+    async def set_alerts_enabled(message: Message, enabled: bool) -> None:
         preferences = get_telegram_preferences_service()
-        await message.answer(toggle_alerts(preferences, str(message.chat.id), True))
+        await message.answer(toggle_alerts(preferences, str(message.chat.id), enabled))
 
-    @dp.message(Command("alerts_off"))
-    async def alerts_off_cmd(message: Message) -> None:
+    async def set_daily_enabled(message: Message, enabled: bool) -> None:
         preferences = get_telegram_preferences_service()
-        await message.answer(toggle_alerts(preferences, str(message.chat.id), False))
+        await message.answer(toggle_daily_reports(preferences, str(message.chat.id), enabled))
 
-    @dp.message(Command("daily_on"))
-    async def daily_on_cmd(message: Message) -> None:
-        preferences = get_telegram_preferences_service()
-        await message.answer(toggle_daily_reports(preferences, str(message.chat.id), True))
-
-    @dp.message(Command("daily_off"))
-    async def daily_off_cmd(message: Message) -> None:
-        preferences = get_telegram_preferences_service()
-        await message.answer(toggle_daily_reports(preferences, str(message.chat.id), False))
-
-    @dp.message(Command("setup"))
-    async def setup_cmd(message: Message) -> None:
-        command_text = message.text or "/setup"
+    async def run_setup_flow(message: Message, command_text: str) -> None:
         reply = setup_flow.start_setup(str(message.chat.id), command_text)
         if len(command_text.strip().split(maxsplit=1)) == 1 and reply.startswith("Выберите биржу"):
             await message.answer(reply, reply_markup=build_setup_exchange_keyboard())
             return
         await message.answer(reply)
+
+    async def run_enable_exchange(message: Message, command_text: str) -> None:
+        reply = setup_flow.enable_exchange(str(message.chat.id), command_text)
+        if len(command_text.strip().split(maxsplit=1)) == 1 and reply.startswith("Укажите биржу"):
+            await message.answer(reply, reply_markup=build_exchange_toggle_keyboard("enable_exchange", get_credential_store()))
+            return
+        await message.answer(reply)
+
+    async def run_disable_exchange(message: Message, command_text: str) -> None:
+        reply = setup_flow.disable_exchange(str(message.chat.id), command_text)
+        if len(command_text.strip().split(maxsplit=1)) == 1 and reply.startswith("Укажите биржу"):
+            await message.answer(reply, reply_markup=build_exchange_toggle_keyboard("disable_exchange", get_credential_store()))
+            return
+        await message.answer(reply)
+
+    async def run_list_exchanges(message: Message) -> None:
+        await message.answer(setup_flow.list_exchanges(str(message.chat.id)))
+
+    async def run_remove_exchange(message: Message, command_text: str) -> None:
+        reply = setup_flow.remove_exchange(str(message.chat.id), command_text)
+        if len(command_text.strip().split(maxsplit=1)) == 1 and reply.startswith("Выберите профиль"):
+            await message.answer(reply, reply_markup=build_remove_exchange_keyboard(get_credential_store()))
+            return
+        await message.answer(reply)
+
+    async def run_cancel(message: Message) -> None:
+        await message.answer(setup_flow.cancel(str(message.chat.id)))
+
+    @dp.message(Command("start"))
+    async def start_cmd(message: Message) -> None:
+        await show_main_menu(message)
+
+    @dp.message(Command("menu"))
+    async def menu_cmd(message: Message) -> None:
+        await show_main_menu(message)
+
+    @dp.message(Command("status"))
+    async def status_cmd(message: Message) -> None:
+        await send_status_reply(message)
+
+    @dp.message(Command("portfolio"))
+    async def portfolio_cmd(message: Message) -> None:
+        await send_portfolio_reply(message)
+
+    @dp.message(Command("risk"))
+    async def risk_cmd(message: Message) -> None:
+        await send_risk_reply(message)
+
+    @dp.message(Command("positions"))
+    async def positions_cmd(message: Message) -> None:
+        await send_positions_reply(message)
+
+    @dp.message(Command("daily"))
+    async def daily_cmd(message: Message) -> None:
+        await send_daily_reply(message)
+
+    @dp.message(Command("alerts"))
+    async def alerts_cmd(message: Message) -> None:
+        await send_alert_settings_reply(message)
+
+    @dp.message(Command("alerts_on"))
+    async def alerts_on_cmd(message: Message) -> None:
+        await set_alerts_enabled(message, True)
+
+    @dp.message(Command("alerts_off"))
+    async def alerts_off_cmd(message: Message) -> None:
+        await set_alerts_enabled(message, False)
+
+    @dp.message(Command("daily_on"))
+    async def daily_on_cmd(message: Message) -> None:
+        await set_daily_enabled(message, True)
+
+    @dp.message(Command("daily_off"))
+    async def daily_off_cmd(message: Message) -> None:
+        await set_daily_enabled(message, False)
+
+    @dp.message(Command("setup"))
+    async def setup_cmd(message: Message) -> None:
+        await run_setup_flow(message, message.text or "/setup")
 
     @dp.callback_query(F.data.startswith("setup_exchange:"))
     async def setup_exchange_callback(callback: CallbackQuery) -> None:
@@ -319,24 +384,51 @@ async def run_bot() -> None:
 
     @dp.message(Command("enable_exchange"))
     async def enable_exchange_cmd(message: Message) -> None:
-        await message.answer(setup_flow.enable_exchange(str(message.chat.id), message.text or ""))
+        await run_enable_exchange(message, message.text or "/enable_exchange")
+
+    @dp.callback_query(F.data.startswith("enable_exchange:"))
+    async def enable_exchange_callback(callback: CallbackQuery) -> None:
+        exchange = parse_exchange_toggle_callback("enable_exchange", callback.data)
+        if exchange is None:
+            await callback.answer("Некорректный выбор профиля.")
+            return
+        if exchange == "cancel":
+            if callback.message is not None:
+                await callback.message.answer("Включение профиля отменено.")
+            await callback.answer()
+            return
+        reply = setup_flow.enable_exchange(str(callback.message.chat.id), f"/enable_exchange {exchange}")
+        if callback.message is not None:
+            await callback.message.answer(reply)
+        await callback.answer()
 
     @dp.message(Command("disable_exchange"))
     async def disable_exchange_cmd(message: Message) -> None:
-        await message.answer(setup_flow.disable_exchange(str(message.chat.id), message.text or ""))
+        await run_disable_exchange(message, message.text or "/disable_exchange")
+
+    @dp.callback_query(F.data.startswith("disable_exchange:"))
+    async def disable_exchange_callback(callback: CallbackQuery) -> None:
+        exchange = parse_exchange_toggle_callback("disable_exchange", callback.data)
+        if exchange is None:
+            await callback.answer("Некорректный выбор профиля.")
+            return
+        if exchange == "cancel":
+            if callback.message is not None:
+                await callback.message.answer("Выключение профиля отменено.")
+            await callback.answer()
+            return
+        reply = setup_flow.disable_exchange(str(callback.message.chat.id), f"/disable_exchange {exchange}")
+        if callback.message is not None:
+            await callback.message.answer(reply)
+        await callback.answer()
 
     @dp.message(Command("exchanges"))
     async def exchanges_cmd(message: Message) -> None:
-        await message.answer(setup_flow.list_exchanges(str(message.chat.id)))
+        await run_list_exchanges(message)
 
     @dp.message(Command("remove_exchange"))
     async def remove_exchange_cmd(message: Message) -> None:
-        command_text = message.text or "/remove_exchange"
-        reply = setup_flow.remove_exchange(str(message.chat.id), command_text)
-        if len(command_text.strip().split(maxsplit=1)) == 1 and reply.startswith("Выберите профиль"):
-            await message.answer(reply, reply_markup=build_remove_exchange_keyboard(get_credential_store()))
-            return
-        await message.answer(reply)
+        await run_remove_exchange(message, message.text or "/remove_exchange")
 
     @dp.callback_query(F.data.startswith("remove_exchange:"))
     async def remove_exchange_callback(callback: CallbackQuery) -> None:
@@ -356,13 +448,46 @@ async def run_bot() -> None:
 
     @dp.message(Command("cancel"))
     async def cancel_cmd(message: Message) -> None:
-        await message.answer(setup_flow.cancel(str(message.chat.id)))
+        await run_cancel(message)
 
     @dp.message()
     async def setup_flow_message_handler(message: Message) -> None:
-        if not setup_flow.has_active_session(str(message.chat.id)):
+        if setup_flow.has_active_session(str(message.chat.id)):
+            await message.answer(await setup_flow.handle_message_async(str(message.chat.id), message.text or ""))
             return
-        await message.answer(await setup_flow.handle_message_async(str(message.chat.id), message.text or ""))
+        menu_command = parse_main_menu_button(message.text or "")
+        if menu_command == "/status":
+            await send_status_reply(message)
+        elif menu_command == "/portfolio":
+            await send_portfolio_reply(message)
+        elif menu_command == "/risk":
+            await send_risk_reply(message)
+        elif menu_command == "/positions":
+            await send_positions_reply(message)
+        elif menu_command == "/daily":
+            await send_daily_reply(message)
+        elif menu_command == "/alerts":
+            await send_alert_settings_reply(message)
+        elif menu_command == "/alerts_on":
+            await set_alerts_enabled(message, True)
+        elif menu_command == "/alerts_off":
+            await set_alerts_enabled(message, False)
+        elif menu_command == "/daily_on":
+            await set_daily_enabled(message, True)
+        elif menu_command == "/daily_off":
+            await set_daily_enabled(message, False)
+        elif menu_command == "/setup":
+            await run_setup_flow(message, "/setup")
+        elif menu_command == "/enable_exchange":
+            await run_enable_exchange(message, "/enable_exchange")
+        elif menu_command == "/disable_exchange":
+            await run_disable_exchange(message, "/disable_exchange")
+        elif menu_command == "/exchanges":
+            await run_list_exchanges(message)
+        elif menu_command == "/remove_exchange":
+            await run_remove_exchange(message, "/remove_exchange")
+        elif menu_command == "/cancel":
+            await run_cancel(message)
 
     stop_event = asyncio.Event()
     tasks = [
