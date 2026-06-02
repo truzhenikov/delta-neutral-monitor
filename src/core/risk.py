@@ -24,6 +24,7 @@ class RiskEngine:
         net_delta = sum(p.delta_usd for p in positions)
 
         liq_distances: list[tuple[float, str]] = []
+        liq_breaches: list[tuple[float, str]] = []
         for p in positions:
             if p.liquidation_price is None or p.mark_price <= 0:
                 continue
@@ -31,10 +32,12 @@ class RiskEngine:
                 dist = (p.mark_price - p.liquidation_price) / p.mark_price * 100
             else:
                 dist = (p.liquidation_price - p.mark_price) / p.mark_price * 100
-            liq_distances.append((dist, f"{p.exchange} {p.symbol} ({p.side})"))
+            context = f"{p.exchange} {p.symbol} ({p.side})"
+            liq_distances.append((dist, context))
+            if dist <= self.min_liq_distance_pct:
+                liq_breaches.append((dist, context))
 
         min_liq_dist = min((dist for dist, _ in liq_distances), default=None)
-        min_liq_context = min(liq_distances, key=lambda item: item[0])[1] if liq_distances else None
 
         warnings: list[str] = []
         if margin_ratio >= self.max_margin_ratio:
@@ -45,9 +48,9 @@ class RiskEngine:
             warnings.append(
                 f"Net delta {net_delta:.2f} USD exceeds threshold {self.max_abs_net_delta_usd:.2f}"
             )
-        if min_liq_dist is not None and min_liq_dist <= self.min_liq_distance_pct:
+        for dist, context in sorted(liq_breaches, key=lambda item: item[0]):
             warnings.append(
-                f"Min liquidation distance {min_liq_dist:.2f}% <= threshold {self.min_liq_distance_pct:.2f}% for {min_liq_context}"
+                f"Min liquidation distance {dist:.2f}% <= threshold {self.min_liq_distance_pct:.2f}% for {context}"
             )
 
         risk_level = "low"
