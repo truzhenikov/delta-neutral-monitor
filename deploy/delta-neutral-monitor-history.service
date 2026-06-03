@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/root/projects/delta-neutral-monitor
+WorkingDirectory=/root/delta-neutral-monitor
 Environment=APP_ENV=prod
 Environment=ENABLED_EXCHANGES=bitget,bingx,hyperliquid,extended,okx,kucoin,aden
 Environment=REQUEST_TIMEOUT_SEC=20
-ExecStartPre=/bin/bash /root/projects/delta-neutral-monitor/scripts/configure_kucoin_public_routes.sh
-ExecStart=/usr/local/lib/hermes-agent/venv/bin/python3 -m src.scripts.capture_history_snapshot
+ExecStartPre=/bin/bash /root/delta-neutral-monitor/scripts/configure_kucoin_public_routes.sh
+ExecStart=/root/delta-neutral-monitor/.venv/bin/python -m src.scripts.capture_history_snapshot

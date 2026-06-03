@@ -146,7 +146,7 @@ def test_render_daily_report_text_includes_previous_day_delta_and_percent() -> N
     assert "+2.00%" in text
 
 
-def test_render_daily_report_text_formats_copy_block_like_table_preview() -> None:
+def test_render_daily_report_text_formats_copy_block_as_two_line_tsv() -> None:
     from src.bot.rendering import render_daily_report_text
 
     current = {"date": "2026-05-18", "equity_usd": 42126.34, "warning_count": 1}
@@ -168,8 +168,8 @@ def test_render_daily_report_text_formats_copy_block_like_table_preview() -> Non
     assert "<pre>" in text
     assert "</pre>" in text
     assert "```" not in text
-    assert "Hyperliquid  Okx      Extended  Bingx    Bitget   Aden     Kucoin   Total" in text
-    assert "9490.24      8517.00  8009.50   6466.10  4318.27  2843.17  2454.33  42098.61" in text
+    assert "Hyperliquid\tOkx\tExtended\tBingx\tBitget\tAden\tKucoin\tTotal" in text
+    assert "9490.24\t8517.00\t8009.50\t6466.10\t4318.27\t2843.17\t2454.33\t42098.61" in text
 
 
 def test_render_daily_report_text_handles_missing_previous_day() -> None:
@@ -184,6 +184,32 @@ def test_render_daily_report_text_handles_missing_previous_day() -> None:
     assert "No previous day snapshot yet" in text
 
 
+def test_render_daily_snapshots_text_shows_recent_rows() -> None:
+    from src.bot.rendering import render_daily_snapshots_text
+
+    rows = [
+        {"date": "2026-06-01", "equity_usd": 38551.97, "change_usd": 29.35, "warning_count": 0},
+        {"date": "2026-05-31", "equity_usd": 38522.62, "change_usd": -12.0, "warning_count": 1},
+    ]
+
+    text = render_daily_snapshots_text(rows)
+
+    assert "Daily snapshots" in text
+    assert "2026-06-01" in text
+    assert "38,551.97 USD" in text
+    assert "+29.35 USD" in text
+    assert "warnings:" not in text
+
+
+def test_render_daily_snapshots_text_handles_empty_state() -> None:
+    from src.bot.rendering import render_daily_snapshots_text
+
+    text = render_daily_snapshots_text([])
+
+    assert "Daily snapshots" in text
+    assert "No daily snapshots yet" in text
+
+
 def test_render_alert_settings_text_shows_enabled_flags() -> None:
     from src.bot.rendering import render_alert_settings_text
 
@@ -192,10 +218,12 @@ def test_render_alert_settings_text_shows_enabled_flags() -> None:
             "alerts_enabled": True,
             "daily_report_enabled": False,
             "daily_report_hour_utc": 7,
+            "alert_min_liq_distance_pct": 8.5,
         }
     )
 
     assert "Alert settings" in text
     assert "Liquidation/risk alerts: ON" in text
+    assert "Liquidation distance alert threshold: 8.50%" in text
     assert "Daily report: OFF" in text
     assert "Scheduled hour (UTC): 07:00" in text

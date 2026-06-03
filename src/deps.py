@@ -69,6 +69,7 @@ def get_telegram_preferences_service() -> TelegramPreferencesService:
         state_path=Path(settings.telegram_state_path),
         admin_chat_ids=settings.telegram_admin_chat_ids_list,
         daily_report_hour_utc=settings.telegram_daily_report_hour_utc,
+        alert_min_liq_distance_pct=settings.min_liq_distance_pct,
     )
 
 

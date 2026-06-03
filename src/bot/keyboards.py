@@ -7,6 +7,7 @@ from src.services.credential_store import CredentialStore
 
 _SETUP_CALLBACK_PREFIX = "setup_exchange:"
 _REMOVE_CALLBACK_PREFIX = "remove_exchange:"
+_ALERT_SETTINGS_CALLBACK_PREFIX = "alert_settings:"
 _TOGGLE_CALLBACK_PREFIXES = {
     "enable_exchange": "enable_exchange:",
     "disable_exchange": "disable_exchange:",
@@ -15,7 +16,8 @@ _REMOVE_CANCEL = "cancel"
 _MAIN_MENU_ROWS = [
     [("Статус", "/status"), ("Портфель", "/portfolio")],
     [("Риск", "/risk"), ("Позиции", "/positions")],
-    [("День", "/daily"), ("Алерты", "/alerts")],
+    [("День", "/daily"), ("Дневные снепшоты", "/daily_snapshots")],
+    [("Алерты", "/alerts")],
     [("Алерты ВКЛ", "/alerts_on"), ("Алерты ВЫКЛ", "/alerts_off")],
     [("День ВКЛ", "/daily_on"), ("День ВЫКЛ", "/daily_off")],
 ]
@@ -47,7 +49,8 @@ class _FallbackKeyboardButton:
 class _FallbackReplyKeyboardMarkup:
     keyboard: list[list[_FallbackKeyboardButton]]
     resize_keyboard: bool = True
-    is_persistent: bool = True
+    is_persistent: bool = False
+    one_time_keyboard: bool = False
 
 
 def _inline_keyboard_types() -> tuple[type[Any], type[Any]]:
@@ -72,7 +75,12 @@ def build_main_menu_keyboard(*, include_admin: bool) -> Any:
     if include_admin:
         menu_rows.extend(_ADMIN_MENU_ROWS)
     keyboard = [[KeyboardButton(text=text) for text, _command in row] for row in menu_rows]
-    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True, is_persistent=True)
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True,
+        is_persistent=False,
+        one_time_keyboard=False,
+    )
 
 
 def parse_main_menu_button(text: str | None) -> str | None:
@@ -93,6 +101,20 @@ def build_setup_exchange_keyboard() -> Any:
                 for exchange in row_exchanges
             ]
         )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_alert_settings_keyboard() -> Any:
+    InlineKeyboardButton, InlineKeyboardMarkup = _inline_keyboard_types()
+    rows = [
+        [
+            InlineKeyboardButton(
+                text="Порог ликвидации",
+                callback_data=f"{_ALERT_SETTINGS_CALLBACK_PREFIX}set_liq_distance",
+            )
+        ],
+        [InlineKeyboardButton(text="Отмена", callback_data=f"{_ALERT_SETTINGS_CALLBACK_PREFIX}cancel")],
+    ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -118,6 +140,13 @@ def parse_setup_exchange_callback(callback_data: str | None) -> str | None:
         return None
     exchange = callback_data.removeprefix(_SETUP_CALLBACK_PREFIX).strip()
     return exchange or None
+
+
+def parse_alert_settings_callback(callback_data: str | None) -> str | None:
+    if not callback_data or not callback_data.startswith(_ALERT_SETTINGS_CALLBACK_PREFIX):
+        return None
+    action = callback_data.removeprefix(_ALERT_SETTINGS_CALLBACK_PREFIX).strip()
+    return action or None
 
 
 def parse_exchange_toggle_callback(action: str, callback_data: str | None) -> str | None:

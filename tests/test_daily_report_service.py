@@ -51,11 +51,30 @@ def build_history_service(tmp_path: Path) -> HistoryService:
     return service
 
 
-def test_build_report_for_date_selects_latest_snapshot_per_day(tmp_path: Path) -> None:
+def build_daily_service(tmp_path: Path):
     from src.services.daily_report_service import DailyReportService
 
-    history_service = build_history_service(tmp_path)
-    service = DailyReportService(history_service=history_service)
+    return DailyReportService(history_service=build_history_service(tmp_path))
+
+
+def sample_status(equity: float, warnings: list[str] | None = None) -> dict:
+    effective_warnings = [] if warnings is None else warnings
+    return {
+        "total_equity_usd": equity,
+        "total_available_margin_usd": 15000.0,
+        "total_maintenance_margin_usd": 6000.0,
+        "risk": {"warnings": effective_warnings},
+    }
+
+
+def test_build_report_for_date_uses_dedicated_daily_snapshots(tmp_path: Path) -> None:
+    service = build_daily_service(tmp_path)
+
+    service.capture_snapshot(sample_status(41250.0, ["warn-prev"]), now=datetime(2026, 5, 17, 7, 5, tzinfo=timezone.utc))
+    service.capture_snapshot(
+        sample_status(42126.34, ["warn-current-1", "warn-current-2"]),
+        now=datetime(2026, 5, 18, 7, 5, tzinfo=timezone.utc),
+    )
 
     current, previous = service.build_report_for_date(date(2026, 5, 18))
 
@@ -66,10 +85,10 @@ def test_build_report_for_date_selects_latest_snapshot_per_day(tmp_path: Path) -
 
 
 def test_build_report_for_date_computes_change_fields_from_previous_day(tmp_path: Path) -> None:
-    from src.services.daily_report_service import DailyReportService
+    service = build_daily_service(tmp_path)
 
-    history_service = build_history_service(tmp_path)
-    service = DailyReportService(history_service=history_service)
+    service.capture_snapshot(sample_status(41250.0), now=datetime(2026, 5, 17, 7, 5, tzinfo=timezone.utc))
+    service.capture_snapshot(sample_status(42126.34), now=datetime(2026, 5, 18, 7, 5, tzinfo=timezone.utc))
 
     current, previous = service.build_report_for_date(date(2026, 5, 18))
 
@@ -78,48 +97,24 @@ def test_build_report_for_date_computes_change_fields_from_previous_day(tmp_path
     assert previous["change_usd"] is None
 
 
-def test_build_report_for_date_uses_5am_moscow_day_boundary(tmp_path: Path) -> None:
-    from src.services.daily_report_service import DailyReportService
+def test_capture_snapshot_uses_5am_moscow_day_boundary_for_daily_keys(tmp_path: Path) -> None:
+    service = build_daily_service(tmp_path)
 
-    history_service = HistoryService(storage_dir=tmp_path, interval_hours=1, retention_days=30)
-    snapshots = [
-        PortfolioHistorySnapshotOut(
-            recorded_at=datetime(2026, 5, 18, 0, 0, tzinfo=timezone.utc),
-            total_equity_usd=1000.0,
-            total_available_margin_usd=600.0,
-            total_maintenance_margin_usd=120.0,
-            warning_count=0,
-            warnings=[],
-        ),
-        PortfolioHistorySnapshotOut(
-            recorded_at=datetime(2026, 5, 18, 4, 0, tzinfo=timezone.utc),
-            total_equity_usd=1100.0,
-            total_available_margin_usd=650.0,
-            total_maintenance_margin_usd=125.0,
-            warning_count=1,
-            warnings=["warn-a"],
-        ),
-        PortfolioHistorySnapshotOut(
-            recorded_at=datetime(2026, 5, 19, 0, 0, tzinfo=timezone.utc),
-            total_equity_usd=1300.0,
-            total_available_margin_usd=700.0,
-            total_maintenance_margin_usd=130.0,
-            warning_count=1,
-            warnings=["warn-b"],
-        ),
-        PortfolioHistorySnapshotOut(
-            recorded_at=datetime(2026, 5, 19, 4, 0, tzinfo=timezone.utc),
-            total_equity_usd=1400.0,
-            total_available_margin_usd=760.0,
-            total_maintenance_margin_usd=135.0,
-            warning_count=0,
-            warnings=[],
-        ),
-    ]
-    for snapshot in snapshots:
-        history_service.record(snapshot, now=snapshot.recorded_at)
+    service.capture_snapshot(sample_status(1300.0, ["warn-b"]), now=datetime(2026, 5, 19, 0, 0, tzinfo=timezone.utc))
+    service.capture_snapshot(sample_status(1400.0), now=datetime(2026, 5, 19, 4, 0, tzinfo=timezone.utc))
 
-    service = DailyReportService(history_service=history_service)
+    snapshots = service.read_daily_snapshots()
+
+    assert len(snapshots) == 2
+    assert snapshots[0].recorded_at == datetime(2026, 5, 19, 0, 0, tzinfo=timezone.utc)
+    assert snapshots[1].recorded_at == datetime(2026, 5, 19, 4, 0, tzinfo=timezone.utc)
+
+
+def test_build_report_for_date_uses_daily_snapshot_for_each_business_day(tmp_path: Path) -> None:
+    service = build_daily_service(tmp_path)
+
+    service.capture_snapshot(sample_status(1300.0, ["warn-b"]), now=datetime(2026, 5, 19, 0, 0, tzinfo=timezone.utc))
+    service.capture_snapshot(sample_status(1400.0), now=datetime(2026, 5, 19, 4, 0, tzinfo=timezone.utc))
 
     current, previous = service.build_report_for_date(date(2026, 5, 19))
 
@@ -130,22 +125,22 @@ def test_build_report_for_date_uses_5am_moscow_day_boundary(tmp_path: Path) -> N
     assert previous["equity_usd"] == 1300.0
 
 
-def test_build_report_for_date_returns_none_without_previous_day(tmp_path: Path) -> None:
-    from src.services.daily_report_service import DailyReportService
+def test_capture_snapshot_replaces_existing_snapshot_for_same_business_day(tmp_path: Path) -> None:
+    service = build_daily_service(tmp_path)
 
-    history_service = HistoryService(storage_dir=tmp_path, interval_hours=1, retention_days=30)
-    history_service.record(
-        PortfolioHistorySnapshotOut(
-            recorded_at=datetime(2026, 5, 18, 22, 0, tzinfo=timezone.utc),
-            total_equity_usd=42126.34,
-            total_available_margin_usd=15300.0,
-            total_maintenance_margin_usd=6150.0,
-            warning_count=0,
-            warnings=[],
-        ),
-        now=datetime(2026, 5, 18, 22, 0, tzinfo=timezone.utc),
-    )
-    service = DailyReportService(history_service=history_service)
+    service.capture_snapshot(sample_status(1000.0), now=datetime(2026, 5, 18, 7, 0, tzinfo=timezone.utc))
+    service.capture_snapshot(sample_status(1100.0, ["updated"]), now=datetime(2026, 5, 18, 7, 10, tzinfo=timezone.utc))
+
+    snapshots = service.read_daily_snapshots()
+
+    assert len(snapshots) == 1
+    assert snapshots[0].total_equity_usd == 1100.0
+    assert snapshots[0].warnings == ["updated"]
+
+
+def test_build_report_for_date_returns_none_without_previous_day(tmp_path: Path) -> None:
+    service = build_daily_service(tmp_path)
+    service.capture_snapshot(sample_status(42126.34), now=datetime(2026, 5, 18, 7, 5, tzinfo=timezone.utc))
 
     assert service.build_report_for_date(date(2026, 5, 18)) is None
 
@@ -190,18 +185,18 @@ def test_should_send_uses_5am_moscow_business_day_for_dedupe(tmp_path: Path) -> 
 
 def test_send_due_daily_reports_sends_once_and_marks_sent(tmp_path: Path) -> None:
     from src.bot.run import send_due_daily_reports
-    from src.services.daily_report_service import DailyReportService
 
-    history_service = build_history_service(tmp_path)
-    daily_service = DailyReportService(history_service=history_service)
+    daily_service = build_daily_service(tmp_path)
+    daily_service.capture_snapshot(sample_status(41250.0), now=datetime(2026, 5, 17, 7, 5, tzinfo=timezone.utc))
     prefs = TelegramPreferencesService(state_path=tmp_path / "telegram-state.json", admin_chat_ids=[], daily_report_hour_utc=7)
     prefs.set_daily_report_enabled("123", True)
     prefs.set_daily_report_enabled("456", False)
     bot = AsyncMock()
     now = datetime(2026, 5, 18, 7, 5, tzinfo=timezone.utc)
+    status = sample_status(42126.34)
 
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, status=status, now=now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, status=status, now=now))
 
     sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
     assert len(sent_messages) == 1
@@ -213,17 +208,17 @@ def test_send_due_daily_reports_sends_once_and_marks_sent(tmp_path: Path) -> Non
 
 def test_send_due_daily_reports_does_not_mark_sent_on_send_failure(tmp_path: Path) -> None:
     from src.bot.run import send_due_daily_reports
-    from src.services.daily_report_service import DailyReportService
 
-    history_service = build_history_service(tmp_path)
-    daily_service = DailyReportService(history_service=history_service)
+    daily_service = build_daily_service(tmp_path)
+    daily_service.capture_snapshot(sample_status(41250.0), now=datetime(2026, 5, 17, 7, 5, tzinfo=timezone.utc))
     prefs = TelegramPreferencesService(state_path=tmp_path / "telegram-state.json", admin_chat_ids=[], daily_report_hour_utc=7)
     prefs.set_daily_report_enabled("123", True)
     bot = AsyncMock()
     bot.send_message.side_effect = TimeoutError("telegram timeout")
     now = datetime(2026, 5, 18, 7, 5, tzinfo=timezone.utc)
+    status = sample_status(42126.34)
 
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, status=status, now=now))
 
     assert bot.send_message.await_count == 1
     assert prefs.get_chat("123").get("last_daily_report_date") is None
@@ -231,46 +226,17 @@ def test_send_due_daily_reports_does_not_mark_sent_on_send_failure(tmp_path: Pat
 
 def test_send_due_daily_reports_uses_business_day_key_for_report_selection_and_dedupe(tmp_path: Path) -> None:
     from src.bot.run import send_due_daily_reports
-    from src.services.daily_report_service import DailyReportService
 
-    history_service = HistoryService(storage_dir=tmp_path, interval_hours=1, retention_days=30)
-    snapshots = [
-        PortfolioHistorySnapshotOut(
-            recorded_at=datetime(2026, 5, 17, 23, 0, tzinfo=timezone.utc),
-            total_equity_usd=1200.0,
-            total_available_margin_usd=600.0,
-            total_maintenance_margin_usd=120.0,
-            warning_count=0,
-            warnings=[],
-        ),
-        PortfolioHistorySnapshotOut(
-            recorded_at=datetime(2026, 5, 18, 23, 0, tzinfo=timezone.utc),
-            total_equity_usd=1300.0,
-            total_available_margin_usd=650.0,
-            total_maintenance_margin_usd=125.0,
-            warning_count=1,
-            warnings=["warn-business-day"],
-        ),
-        PortfolioHistorySnapshotOut(
-            recorded_at=datetime(2026, 5, 19, 1, 0, tzinfo=timezone.utc),
-            total_equity_usd=1350.0,
-            total_available_margin_usd=680.0,
-            total_maintenance_margin_usd=128.0,
-            warning_count=0,
-            warnings=[],
-        ),
-    ]
-    for snapshot in snapshots:
-        history_service.record(snapshot, now=snapshot.recorded_at)
-
-    daily_service = DailyReportService(history_service=history_service)
+    daily_service = build_daily_service(tmp_path)
+    daily_service.capture_snapshot(sample_status(1200.0), now=datetime(2026, 5, 17, 23, 0, tzinfo=timezone.utc))
+    daily_service.capture_snapshot(sample_status(1300.0, ["warn-business-day"]), now=datetime(2026, 5, 18, 23, 0, tzinfo=timezone.utc))
     prefs = TelegramPreferencesService(state_path=tmp_path / "telegram-state.json", admin_chat_ids=[], daily_report_hour_utc=1)
     prefs.set_daily_report_enabled("123", True)
     bot = AsyncMock()
     now = datetime(2026, 5, 19, 1, 5, tzinfo=timezone.utc)
 
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
-    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, now=now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, status=sample_status(1350.0), now=now))
+    asyncio.run(send_due_daily_reports(bot, prefs, daily_service, status=sample_status(1350.0), now=now))
 
     sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
     assert len(sent_messages) == 1

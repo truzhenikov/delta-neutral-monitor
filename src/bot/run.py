@@ -14,15 +14,19 @@ if TYPE_CHECKING:
 from src.bot.command_logic import (
     build_alert_settings_reply,
     build_daily_reply,
+    build_daily_snapshots_reply,
     build_portfolio_reply,
+    set_alert_min_liq_distance,
     toggle_alerts,
     toggle_daily_reports,
 )
 from src.bot.keyboards import (
+    build_alert_settings_keyboard,
     build_exchange_toggle_keyboard,
     build_main_menu_keyboard,
     build_remove_exchange_keyboard,
     build_setup_exchange_keyboard,
+    parse_alert_settings_callback,
     parse_exchange_toggle_callback,
     parse_main_menu_button,
     parse_remove_exchange_callback,
@@ -115,6 +119,19 @@ async def safe_send_message(bot: Any, chat_id: str, text: str, *, context: str, 
     return True
 
 
+def parse_percentage_value(text: str) -> float | None:
+    normalized = text.strip().replace(",", ".").replace("%", "")
+    if not normalized:
+        return None
+    try:
+        value = float(normalized)
+    except ValueError:
+        return None
+    if value <= 0:
+        return None
+    return value
+
+
 async def send_alerts_for_snapshot(
     bot: Any,
     snapshot,
@@ -122,22 +139,30 @@ async def send_alerts_for_snapshot(
     alerting_service,
     bootstrap_chat_id: str = "",
 ) -> None:
-    pending_alerts = alerting_service.collect_pending_alerts(snapshot)
-    if not pending_alerts:
-        return
     chat_ids = resolve_alert_chat_ids(preferences, bootstrap_chat_id=bootstrap_chat_id)
-    for alert in pending_alerts:
-        delivered = False
-        for chat_id in chat_ids:
+    if not chat_ids:
+        return
+    delivered_keys: set[str] = set()
+    for chat_id in chat_ids:
+        chat_settings = preferences.get_chat(chat_id)
+        liq_threshold = float(chat_settings.get("alert_min_liq_distance_pct", 12.0))
+        pending_alerts = alerting_service.collect_pending_alerts_for_liq_threshold(
+            snapshot,
+            min_liq_distance_pct=liq_threshold,
+        )
+        for alert in pending_alerts:
             sent = await safe_send_message(bot, chat_id, alert.text, context="alert")
-            delivered = delivered or sent
-        if delivered:
-            alerting_service.mark_sent(alert.key)
+            if sent:
+                delivered_keys.add(alert.key)
+    for key in delivered_keys:
+        alerting_service.mark_sent(key)
 
 
 async def send_due_daily_reports(bot: Any, preferences, daily_report_service, status: dict | None = None, now: datetime | None = None) -> None:
     effective_now = now or datetime.now(timezone.utc)
     report_day_key = daily_report_service.report_day_key(effective_now)
+    if status is not None:
+        daily_report_service.capture_snapshot(status, now=effective_now)
     report = daily_report_service.build_report_for_date(date.fromisoformat(report_day_key))
     if report is None:
         return
@@ -242,6 +267,7 @@ async def run_bot() -> None:
         credential_store=get_credential_store(),
         validation_service=get_credential_validation_service(),
     )
+    awaiting_alert_liq_distance_chat_ids: set[str] = set()
 
     async def show_main_menu(message: Message) -> None:
         preferences = get_telegram_preferences_service()
@@ -268,22 +294,68 @@ async def run_bot() -> None:
         await message.answer(render_positions_text(snapshot))
 
     async def send_daily_reply(message: Message) -> None:
-        history_service = get_history_service()
-        history = history_service.build_history_response().model_dump(mode="json")
+        daily_report_service = get_daily_report_service()
+        report = daily_report_service.build_latest_report()
         status = await collect_status_snapshot()
-        await message.answer(build_daily_reply(history, status), parse_mode="HTML")
+        if report is None:
+            await message.answer(
+                build_daily_reply({"daily_changes": []}, status),
+                parse_mode="HTML",
+            )
+            return
+        current, previous = report
+        await message.answer(build_daily_reply({"daily_changes": [current, previous]}, status), parse_mode="HTML")
+
+    async def send_daily_snapshots_reply(message: Message) -> None:
+        daily_report_service = get_daily_report_service()
+        rows = [current for current, _previous in daily_report_service.build_recent_reports(limit=10)]
+        await message.answer(build_daily_snapshots_reply({"daily_changes": rows}))
 
     async def send_alert_settings_reply(message: Message) -> None:
         preferences = get_telegram_preferences_service()
-        await message.answer(build_alert_settings_reply(preferences, str(message.chat.id)))
+        awaiting_alert_liq_distance_chat_ids.discard(str(message.chat.id))
+        await message.answer(
+            build_alert_settings_reply(preferences, str(message.chat.id)),
+            reply_markup=build_alert_settings_keyboard(),
+        )
 
     async def set_alerts_enabled(message: Message, enabled: bool) -> None:
         preferences = get_telegram_preferences_service()
-        await message.answer(toggle_alerts(preferences, str(message.chat.id), enabled))
+        await message.answer(
+            toggle_alerts(preferences, str(message.chat.id), enabled),
+            reply_markup=build_alert_settings_keyboard(),
+        )
 
     async def set_daily_enabled(message: Message, enabled: bool) -> None:
         preferences = get_telegram_preferences_service()
-        await message.answer(toggle_daily_reports(preferences, str(message.chat.id), enabled))
+        await message.answer(
+            toggle_daily_reports(preferences, str(message.chat.id), enabled),
+            reply_markup=build_alert_settings_keyboard(),
+        )
+
+    async def prompt_alert_liq_distance(message: Message) -> None:
+        awaiting_alert_liq_distance_chat_ids.add(str(message.chat.id))
+        await message.answer(
+            "Введите порог дистанции до ликвидации в процентах.\n"
+            "Пример: 8 или 8.5\n"
+            "Напишите /cancel для отмены."
+        )
+
+    async def apply_alert_liq_distance(message: Message) -> bool:
+        chat_id = str(message.chat.id)
+        if chat_id not in awaiting_alert_liq_distance_chat_ids:
+            return False
+        value = parse_percentage_value(message.text or "")
+        if value is None:
+            await message.answer("Не понял значение. Введите положительное число в процентах, например 8 или 8.5.")
+            return True
+        preferences = get_telegram_preferences_service()
+        awaiting_alert_liq_distance_chat_ids.discard(chat_id)
+        await message.answer(
+            set_alert_min_liq_distance(preferences, chat_id, value),
+            reply_markup=build_alert_settings_keyboard(),
+        )
+        return True
 
     async def run_setup_flow(message: Message, command_text: str) -> None:
         reply = setup_flow.start_setup(str(message.chat.id), command_text)
@@ -317,7 +389,9 @@ async def run_bot() -> None:
         await message.answer(reply)
 
     async def run_cancel(message: Message) -> None:
-        await message.answer(setup_flow.cancel(str(message.chat.id)))
+        chat_id = str(message.chat.id)
+        awaiting_alert_liq_distance_chat_ids.discard(chat_id)
+        await message.answer(setup_flow.cancel(chat_id))
 
     @dp.message(Command("start"))
     async def start_cmd(message: Message) -> None:
@@ -346,6 +420,10 @@ async def run_bot() -> None:
     @dp.message(Command("daily"))
     async def daily_cmd(message: Message) -> None:
         await send_daily_reply(message)
+
+    @dp.message(Command("daily_snapshots"))
+    async def daily_snapshots_cmd(message: Message) -> None:
+        await send_daily_snapshots_reply(message)
 
     @dp.message(Command("alerts"))
     async def alerts_cmd(message: Message) -> None:
@@ -446,12 +524,36 @@ async def run_bot() -> None:
             await callback.message.answer(reply)
         await callback.answer()
 
+    @dp.callback_query(F.data.startswith("alert_settings:"))
+    async def alert_settings_callback(callback: CallbackQuery) -> None:
+        action = parse_alert_settings_callback(callback.data)
+        if callback.message is None or action is None:
+            await callback.answer("Некорректное действие.")
+            return
+        if action == "set_liq_distance":
+            awaiting_alert_liq_distance_chat_ids.add(str(callback.message.chat.id))
+            await callback.message.answer(
+                "Введите порог дистанции до ликвидации в процентах.\n"
+                "Пример: 8 или 8.5\n"
+                "Напишите /cancel для отмены."
+            )
+            await callback.answer()
+            return
+        if action == "cancel":
+            awaiting_alert_liq_distance_chat_ids.discard(str(callback.message.chat.id))
+            await callback.message.answer("Настройка алертов отменена.")
+            await callback.answer()
+            return
+        await callback.answer("Неизвестное действие.")
+
     @dp.message(Command("cancel"))
     async def cancel_cmd(message: Message) -> None:
         await run_cancel(message)
 
     @dp.message()
     async def setup_flow_message_handler(message: Message) -> None:
+        if await apply_alert_liq_distance(message):
+            return
         if setup_flow.has_active_session(str(message.chat.id)):
             await message.answer(await setup_flow.handle_message_async(str(message.chat.id), message.text or ""))
             return
@@ -466,6 +568,8 @@ async def run_bot() -> None:
             await send_positions_reply(message)
         elif menu_command == "/daily":
             await send_daily_reply(message)
+        elif menu_command == "/daily_snapshots":
+            await send_daily_snapshots_reply(message)
         elif menu_command == "/alerts":
             await send_alert_settings_reply(message)
         elif menu_command == "/alerts_on":

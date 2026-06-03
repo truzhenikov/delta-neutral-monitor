@@ -49,9 +49,8 @@ def render_copy_block(status: dict | None) -> str:
     headers.append(COPY_BLOCK_TOTAL_LABEL)
     values.append(total_value)
 
-    widths = [max(len(header), len(value)) for header, value in zip(headers, values)]
-    header_row = "  ".join(header.ljust(width) for header, width in zip(headers, widths))
-    value_row = "  ".join(value.ljust(width) for value, width in zip(values, widths))
+    header_row = "\t".join(headers)
+    value_row = "\t".join(values)
     block_text = f"{header_row}\n{value_row}"
     return f"<pre>{escape(block_text)}</pre>"
 
@@ -110,14 +109,34 @@ def render_daily_report_text(current: dict, previous: dict | None, status: dict 
     return "\n".join(lines)
 
 
+def render_daily_snapshots_text(rows: list[dict]) -> str:
+    lines = ["Daily snapshots"]
+    if not rows:
+        lines.append("No daily snapshots yet")
+        return "\n".join(lines)
+
+    for row in rows:
+        change = row.get("change_usd")
+        change_text = "n/a" if change is None else f"{float(change):+,.2f} USD"
+        lines.extend(
+            [
+                f"- {row['date']}: {_fmt_usd(row['equity_usd'])}",
+                f"  change: {change_text}",
+            ]
+        )
+    return "\n".join(lines)
+
+
 def render_alert_settings_text(settings: dict) -> str:
     alerts_enabled = "ON" if settings.get("alerts_enabled") else "OFF"
     daily_enabled = "ON" if settings.get("daily_report_enabled") else "OFF"
     hour = int(settings.get("daily_report_hour_utc", 7))
+    min_liq_distance = float(settings.get("alert_min_liq_distance_pct", 12.0))
     return "\n".join(
         [
             "Alert settings",
             f"Liquidation/risk alerts: {alerts_enabled}",
+            f"Liquidation distance alert threshold: {min_liq_distance:.2f}%",
             f"Daily report: {daily_enabled}",
             f"Scheduled hour (UTC): {hour:02d}:00",
         ]

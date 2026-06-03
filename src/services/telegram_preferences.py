@@ -6,10 +6,17 @@ from typing import Any
 
 
 class TelegramPreferencesService:
-    def __init__(self, state_path: Path, admin_chat_ids: list[str], daily_report_hour_utc: int = 7) -> None:
+    def __init__(
+        self,
+        state_path: Path,
+        admin_chat_ids: list[str],
+        daily_report_hour_utc: int = 7,
+        alert_min_liq_distance_pct: float = 12.0,
+    ) -> None:
         self.state_path = state_path
         self.admin_chat_ids = set(admin_chat_ids)
         self.daily_report_hour_utc = daily_report_hour_utc
+        self.alert_min_liq_distance_pct = alert_min_liq_distance_pct
 
     def get_chat(self, chat_id: str) -> dict[str, Any]:
         state = self._read_state()
@@ -25,6 +32,9 @@ class TelegramPreferencesService:
 
     def set_daily_report_enabled(self, chat_id: str, enabled: bool) -> dict[str, Any]:
         return self._update_chat(chat_id, {"daily_report_enabled": bool(enabled)})
+
+    def set_alert_min_liq_distance_pct(self, chat_id: str, value: float) -> dict[str, Any]:
+        return self._update_chat(chat_id, {"alert_min_liq_distance_pct": float(value)})
 
     def mark_daily_report_sent(self, chat_id: str, date_iso: str) -> None:
         self._update_chat(chat_id, {"last_daily_report_date": date_iso})
@@ -55,6 +65,7 @@ class TelegramPreferencesService:
             "alerts_enabled": False,
             "daily_report_enabled": False,
             "daily_report_hour_utc": self.daily_report_hour_utc,
+            "alert_min_liq_distance_pct": self.alert_min_liq_distance_pct,
             "authorized": False,
             "last_daily_report_date": None,
         }

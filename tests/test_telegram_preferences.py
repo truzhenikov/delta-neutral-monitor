@@ -35,6 +35,7 @@ def test_preferences_store_returns_defaults_for_unknown_chat(tmp_path: Path) -> 
 
     assert chat["alerts_enabled"] is False
     assert chat["daily_report_enabled"] is False
+    assert chat["alert_min_liq_distance_pct"] == 12.0
     assert chat["authorized"] is False
     assert chat["last_daily_report_date"] is None
 

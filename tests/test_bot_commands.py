@@ -71,7 +71,7 @@ def test_build_daily_reply_uses_latest_two_days() -> None:
     assert "+826.34 USD" in text
 
 
-def test_build_daily_reply_includes_copy_block_as_monospace_table() -> None:
+def test_build_daily_reply_includes_copy_block_as_two_line_tsv() -> None:
     from src.bot.command_logic import build_daily_reply
 
     status = {
@@ -91,9 +91,8 @@ def test_build_daily_reply_includes_copy_block_as_monospace_table() -> None:
     assert "<pre>" in text
     assert "</pre>" in text
     assert "```" not in text
-    assert "Hyperliquid  Okx      Extended  Bingx    Bitget   Aden     Kucoin   Total" in text
-    assert "9490.24      8517.00  8009.50   6466.10  4318.27  2843.17  2454.33  42098.61" in text
-    assert "HL\tAden\tKucoin" not in text
+    assert "Hyperliquid\tOkx\tExtended\tBingx\tBitget\tAden\tKucoin\tTotal" in text
+    assert "9490.24\t8517.00\t8009.50\t6466.10\t4318.27\t2843.17\t2454.33\t42098.61" in text
     assert "12189,72" not in text
 
 
@@ -103,6 +102,24 @@ def test_build_daily_reply_handles_missing_previous_day() -> None:
     text = build_daily_reply({"daily_changes": [{"date": "2026-05-18", "equity_usd": 42126.34, "change_usd": None, "warning_count": 0, "warnings": []}]})
 
     assert "No previous day snapshot yet" in text
+
+
+def test_build_daily_snapshots_reply_renders_rows() -> None:
+    from src.bot.command_logic import build_daily_snapshots_reply
+
+    text = build_daily_snapshots_reply(
+        {
+            "daily_changes": [
+                {"date": "2026-06-01", "equity_usd": 38551.97, "change_usd": 29.35, "warning_count": 0, "warnings": []},
+                {"date": "2026-05-31", "equity_usd": 38522.62, "change_usd": -12.0, "warning_count": 1, "warnings": ["warn"]},
+            ]
+        }
+    )
+
+    assert "Daily snapshots" in text
+    assert "2026-06-01" in text
+    assert "38,522.62 USD" in text
+    assert "warnings:" not in text
 
 
 def test_toggle_alerts_updates_preferences_and_returns_settings_text(tmp_path) -> None:
@@ -126,3 +143,14 @@ def test_toggle_daily_reports_updates_preferences_and_returns_settings_text(tmp_
     assert prefs.get_chat("777")["daily_report_enabled"] is True
     assert "Daily report: ON" in text
     assert "Scheduled hour (UTC): 09:00" in text
+
+
+def test_set_alert_min_liq_distance_updates_preferences_and_returns_settings_text(tmp_path) -> None:
+    from src.bot.command_logic import set_alert_min_liq_distance
+
+    prefs = TelegramPreferencesService(state_path=tmp_path / "state.json", admin_chat_ids=[])
+
+    text = set_alert_min_liq_distance(prefs, chat_id="777", value=8.5)
+
+    assert prefs.get_chat("777")["alert_min_liq_distance_pct"] == 8.5
+    assert "Liquidation distance alert threshold: 8.50%" in text

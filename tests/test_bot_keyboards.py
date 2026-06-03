@@ -8,6 +8,10 @@ def test_build_main_menu_keyboard_contains_core_and_admin_buttons() -> None:
 
     markup = build_main_menu_keyboard(include_admin=True)
 
+    assert markup.resize_keyboard is True
+    assert markup.is_persistent is False
+    assert markup.one_time_keyboard is False
+
     buttons = [button for row in markup.keyboard for button in row]
     texts = [button.text for button in buttons]
 
@@ -17,6 +21,7 @@ def test_build_main_menu_keyboard_contains_core_and_admin_buttons() -> None:
         "Риск",
         "Позиции",
         "День",
+        "Дневные снепшоты",
         "Алерты",
         "Алерты ВКЛ",
         "Алерты ВЫКЛ",
@@ -30,6 +35,7 @@ def test_build_main_menu_keyboard_contains_core_and_admin_buttons() -> None:
         "Отмена",
     ]
     assert parse_main_menu_button("Статус") == "/status"
+    assert parse_main_menu_button("Дневные снепшоты") == "/daily_snapshots"
     assert parse_main_menu_button("Настроить биржу") == "/setup"
     assert parse_main_menu_button("Отмена") == "/cancel"
 
@@ -98,3 +104,19 @@ def test_build_enable_exchange_keyboard_lists_profiles_and_cancel(tmp_path: Path
     assert parse_exchange_toggle_callback("enable_exchange", "enable_exchange:okx:main") == "okx:main"
     assert parse_exchange_toggle_callback("enable_exchange", "enable_exchange:cancel") == "cancel"
     assert parse_exchange_toggle_callback("enable_exchange", "disable_exchange:okx:main") is None
+
+
+def test_build_alert_settings_keyboard_contains_liq_threshold_button_and_cancel() -> None:
+    from src.bot.keyboards import build_alert_settings_keyboard, parse_alert_settings_callback
+
+    markup = build_alert_settings_keyboard()
+
+    buttons = [button for row in markup.inline_keyboard for button in row]
+    texts = [button.text for button in buttons]
+    callback_data = [button.callback_data for button in buttons]
+
+    assert texts == ["Порог ликвидации", "Отмена"]
+    assert callback_data == ["alert_settings:set_liq_distance", "alert_settings:cancel"]
+    assert parse_alert_settings_callback("alert_settings:set_liq_distance") == "set_liq_distance"
+    assert parse_alert_settings_callback("alert_settings:cancel") == "cancel"
+    assert parse_alert_settings_callback("remove_exchange:cancel") is None
