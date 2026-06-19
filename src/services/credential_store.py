@@ -13,6 +13,7 @@ class CredentialStore:
         "kucoin": ("api_key", "api_secret", "api_passphrase"),
         "aden": ("api_key", "api_secret"),
         "vest": ("api_key", "account_group"),
+        "lighter": ("account_index", "l1_address"),
         "hyperliquid": ("user_address",),
         "extended": ("api_key", "stark_key_public", "stark_key_private", "vault_number", "client_id"),
     }

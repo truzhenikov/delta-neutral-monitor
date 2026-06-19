@@ -1101,3 +1101,102 @@ class VestRealConnector(_BaseRealConnector):
             positions=positions,
             updated_at=utc_now(),
         )
+
+
+class LighterRealConnector(_BaseRealConnector):
+    exchange = "lighter"
+
+    async def _resolve_account_index(self, base_url: str, l1_address: str) -> str:
+        payload = await self._get(
+            base_url=base_url,
+            path="/api/v1/accountsByL1Address",
+            params={"l1_address": l1_address},
+            headers={"accept": "application/json"},
+        )
+        sub_accounts = payload.get("sub_accounts") or []
+        if not isinstance(sub_accounts, list) or not sub_accounts:
+            raise RealConnectorRequestError(f"lighter account lookup returned no accounts for {l1_address}")
+        if len(sub_accounts) != 1:
+            indexes = ", ".join(str(item.get("index")) for item in sub_accounts if item.get("index") is not None)
+            raise RealConnectorNotConfiguredError(
+                "lighter account_index is required when one wallet has multiple accounts"
+                + (f" (available indexes: {indexes})" if indexes else "")
+            )
+        index = sub_accounts[0].get("index")
+        if index is None:
+            raise RealConnectorRequestError(f"lighter account lookup missing index for {l1_address}")
+        return str(index)
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        account_index = credentials.get("account_index") or settings.lighter_account_index
+        l1_address = credentials.get("l1_address") or settings.lighter_l1_address
+        if not account_index and not l1_address:
+            raise RealConnectorNotConfiguredError(
+                "lighter credentials are not configured (LIGHTER_ACCOUNT_INDEX or LIGHTER_L1_ADDRESS)"
+            )
+        if not account_index and l1_address:
+            account_index = await self._resolve_account_index(settings.lighter_api_base, l1_address)
+
+        payload = await self._get(
+            base_url=settings.lighter_api_base,
+            path="/api/v1/account",
+            params={"by": "index", "value": str(account_index), "active_only": True},
+            headers={"accept": "application/json"},
+        )
+        accounts = payload.get("accounts") or []
+        if not isinstance(accounts, list) or not accounts:
+            raise RealConnectorRequestError(f"lighter account error: {payload}")
+        account = accounts[0]
+
+        positions: list[Position] = []
+        for row in account.get("positions") or []:
+            size = abs(_safe_float(row.get("position")))
+            if size <= 0:
+                continue
+            sign = int(_safe_float(row.get("sign"), default=0.0))
+            side = "short" if sign < 0 else "long"
+            entry_price = _safe_float(row.get("avg_entry_price"))
+            position_value = abs(_safe_float(row.get("position_value")))
+            mark_price = position_value / size if size > 0 and position_value > 0 else entry_price
+            allocated_margin = _safe_float(row.get("allocated_margin"))
+            if allocated_margin > 0 and position_value > 0:
+                leverage = position_value / allocated_margin
+            else:
+                initial_margin_fraction = _safe_float(row.get("initial_margin_fraction"))
+                leverage = 100.0 / initial_margin_fraction if initial_margin_fraction > 0 else 1.0
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("symbol") or "UNKNOWN"),
+                    side=side,
+                    size=size,
+                    entry_price=entry_price,
+                    mark_price=mark_price if mark_price > 0 else entry_price,
+                    leverage=leverage if leverage > 0 else 1.0,
+                    liquidation_price=_safe_liq_price(row.get("liquidation_price")),
+                )
+            )
+
+        equity = _safe_float(account.get("total_asset_value"))
+        if equity <= 0:
+            equity = _safe_float(account.get("collateral")) + sum(position.pnl_usd for position in positions)
+
+        maintenance = _safe_float(account.get("cross_maintenance_margin_requirement"))
+        if maintenance <= 0:
+            maintenance = sum(
+                _safe_float(row.get("allocated_margin"))
+                for row in account.get("positions") or []
+                if _safe_float(row.get("position")) != 0
+            )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=_safe_float(account.get("available_balance")),
+            maintenance_margin_usd=maintenance,
+            positions=positions,
+            updated_at=utc_now(),
+        )

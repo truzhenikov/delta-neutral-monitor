@@ -66,3 +66,10 @@ class VestConnector(ExchangeConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         return make_mock_snapshot(self.exchange, price_shift=75)
+
+
+class LighterConnector(ExchangeConnector):
+    exchange = "lighter"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=95)

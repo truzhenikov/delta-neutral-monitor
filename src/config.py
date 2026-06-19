@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     heartbeat_interval_sec: int = Field(default=3600, alias="HEARTBEAT_INTERVAL_SEC")
 
     enabled_exchanges: str = Field(
-        default="bitget,bingx,mexc,hyperliquid,extended,okx,kucoin,aden,vest", alias="ENABLED_EXCHANGES"
+        default="bitget,bingx,mexc,hyperliquid,extended,okx,kucoin,aden,vest,lighter", alias="ENABLED_EXCHANGES"
     )
 
     bitget_api_base: str = Field(default="https://api.bitget.com", alias="BITGET_API_BASE")
@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     vest_api_base: str = Field(default="https://server-prod.hz.vestmarkets.com/v2", alias="VEST_API_BASE")
     vest_api_key: str = Field(default="", alias="VEST_API_KEY")
     vest_account_group: str = Field(default="", alias="VEST_ACCOUNT_GROUP")
+
+    lighter_api_base: str = Field(default="https://mainnet.zklighter.elliot.ai", alias="LIGHTER_API_BASE")
+    lighter_account_index: str = Field(default="", alias="LIGHTER_ACCOUNT_INDEX")
+    lighter_l1_address: str = Field(default="", alias="LIGHTER_L1_ADDRESS")
 
     max_margin_ratio: float = Field(default=0.75, alias="MAX_MARGIN_RATIO")
     min_liq_distance_pct: float = Field(default=12.0, alias="MIN_LIQ_DISTANCE_PCT")

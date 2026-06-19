@@ -11,6 +11,8 @@ from src.services.telegram_preferences import TelegramPreferencesService
 FIELD_LABELS: dict[tuple[str, str], str] = {
     ("hyperliquid", "user_address"): "wallet address",
     ("vest", "account_group"): "account group",
+    ("lighter", "l1_address"): "wallet address",
+    ("lighter", "account_index"): "account index",
 }
 
 
@@ -217,6 +219,7 @@ class TelegramSetupFlow:
 
     def _prompt_for_current_field(self, session: SetupSession) -> str:
         field_name = self._required_fields(session)[session.field_index]
-        display_name = FIELD_LABELS.get((session.exchange, field_name), field_name)
+        exchange = session.exchange or ""
+        display_name = FIELD_LABELS.get((exchange, field_name), field_name)
         target = self._exchange_ref(session) if session.profile_name else session.exchange
         return f"Введите значение поля {display_name} для {target}. Для отмены используйте /cancel."
