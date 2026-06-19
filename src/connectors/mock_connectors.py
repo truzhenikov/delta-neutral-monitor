@@ -59,3 +59,10 @@ class AdenConnector(ExchangeConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         return make_mock_snapshot(self.exchange, price_shift=-90)
+
+
+class VestConnector(ExchangeConnector):
+    exchange = "vest"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=75)

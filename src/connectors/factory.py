@@ -10,6 +10,7 @@ from src.connectors.mock_connectors import (
     KucoinConnector,
     MexcConnector,
     OkxConnector,
+    VestConnector,
 )
 from src.connectors.real_connectors import (
     AdenRealConnector,
@@ -20,6 +21,7 @@ from src.connectors.real_connectors import (
     KucoinRealConnector,
     MexcRealConnector,
     OkxRealConnector,
+    VestRealConnector,
 )
 from src.services.credential_store import CredentialStore
 
@@ -32,6 +34,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "extended": ExtendedConnector,
     "okx": OkxConnector,
     "kucoin": KucoinConnector,
+    "vest": VestConnector,
 }
 
 REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
@@ -43,6 +46,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "extended": ExtendedRealConnector,
     "okx": OkxRealConnector,
     "kucoin": KucoinRealConnector,
+    "vest": VestRealConnector,
 }
 
 

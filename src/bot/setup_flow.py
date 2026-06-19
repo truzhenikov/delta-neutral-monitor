@@ -10,6 +10,7 @@ from src.services.telegram_preferences import TelegramPreferencesService
 
 FIELD_LABELS: dict[tuple[str, str], str] = {
     ("hyperliquid", "user_address"): "wallet address",
+    ("vest", "account_group"): "account group",
 }
 
 

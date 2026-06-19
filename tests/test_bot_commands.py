@@ -53,10 +53,10 @@ def test_build_portfolio_reply_uses_renderer_output() -> None:
     text = build_portfolio_reply(sample_status())
 
     assert "Portfolio summary" in text
-    assert "42,126.34 USD" in text
+    assert "42126,34 USD" in text
     assert "Real leverage: 0.47x" in text
-    assert "Hyperliquid: 9,552.39 USD (real lev 1.26x)" in text
-    assert "Extended: 8,046.41 USD (real lev 0.99x)" in text
+    assert "Hyperliquid: 9552,39 USD (real lev 1.26x)" in text
+    assert "Extended: 8046,41 USD (real lev 0.99x)" in text
     assert "Connectors down: extended" in text
 
 
@@ -67,8 +67,8 @@ def test_build_daily_reply_uses_latest_two_days() -> None:
 
     assert "Daily portfolio report" in text
     assert "2026-05-18" in text
-    assert "41,300.00 USD" in text
-    assert "+826.34 USD" in text
+    assert "41300,00 USD" in text
+    assert "+826,34 USD" in text
 
 
 def test_build_daily_reply_includes_copy_block_as_two_line_tsv() -> None:
@@ -118,7 +118,7 @@ def test_build_daily_snapshots_reply_renders_rows() -> None:
 
     assert "Daily snapshots" in text
     assert "2026-06-01" in text
-    assert "38,522.62 USD" in text
+    assert "38522,62 USD" in text
     assert "warnings:" not in text
 
 

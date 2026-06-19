@@ -115,19 +115,19 @@ def test_render_portfolio_text_includes_core_totals_and_exchange_breakdown() -> 
     text = render_portfolio_text(sample_status())
 
     assert "Portfolio summary" in text
-    assert "42,126.34 USD" in text
-    assert "16,172.42 USD" in text
-    assert "6,536.58 USD" in text
-    assert "-52.98 USD" in text
+    assert "42126,34 USD" in text
+    assert "16172,42 USD" in text
+    assert "6536,58 USD" in text
+    assert "-52,98 USD" in text
     assert "medium" in text
     assert "Connectors down: extended" in text
     assert "Balances by exchange:" in text
-    assert "Hyperliquid: 9,552.39 USD (real lev 7.20x)" in text
-    assert "Extended: 8,046.41 USD (real lev 3.09x)" in text
-    assert "Bitget: 2,800.12 USD (real lev 1.86x)" in text
-    assert "Kucoin: 2,300.34 USD (real lev 1.78x)" in text
-    assert "Aden: 1,800.56 USD (real lev 0.00x)" in text
-    assert "Bingx: 1,600.78 USD (real lev 1.87x)" in text
+    assert "Hyperliquid: 9552,39 USD (real lev 7.20x)" in text
+    assert "Extended: 8046,41 USD (real lev 3.09x)" in text
+    assert "Bitget: 2800,12 USD (real lev 1.86x)" in text
+    assert "Kucoin: 2300,34 USD (real lev 1.78x)" in text
+    assert "Aden: 1800,56 USD (real lev 0.00x)" in text
+    assert "Bingx: 1600,78 USD (real lev 1.87x)" in text
 
 
 def test_render_daily_report_text_includes_previous_day_delta_and_percent() -> None:
@@ -140,9 +140,9 @@ def test_render_daily_report_text_includes_previous_day_delta_and_percent() -> N
 
     assert "Daily portfolio report" in text
     assert "2026-05-18" in text
-    assert "42,126.34 USD" in text
-    assert "41,300.00 USD" in text
-    assert "+826.34 USD" in text
+    assert "42126,34 USD" in text
+    assert "41300,00 USD" in text
+    assert "+826,34 USD" in text
     assert "+2.00%" in text
 
 
@@ -180,7 +180,7 @@ def test_render_daily_report_text_handles_missing_previous_day() -> None:
     text = render_daily_report_text(current, None)
 
     assert "Daily portfolio report" in text
-    assert "42,126.34 USD" in text
+    assert "42126,34 USD" in text
     assert "No previous day snapshot yet" in text
 
 
@@ -196,8 +196,8 @@ def test_render_daily_snapshots_text_shows_recent_rows() -> None:
 
     assert "Daily snapshots" in text
     assert "2026-06-01" in text
-    assert "38,551.97 USD" in text
-    assert "+29.35 USD" in text
+    assert "38551,97 USD" in text
+    assert "+29,35 USD" in text
     assert "warnings:" not in text
 
 

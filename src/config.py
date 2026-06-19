@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     heartbeat_interval_sec: int = Field(default=3600, alias="HEARTBEAT_INTERVAL_SEC")
 
     enabled_exchanges: str = Field(
-        default="bitget,bingx,mexc,hyperliquid,extended,okx,kucoin,aden", alias="ENABLED_EXCHANGES"
+        default="bitget,bingx,mexc,hyperliquid,extended,okx,kucoin,aden,vest", alias="ENABLED_EXCHANGES"
     )
 
     bitget_api_base: str = Field(default="https://api.bitget.com", alias="BITGET_API_BASE")
@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     aden_api_prefix: str = Field(default="/api/v1", alias="ADEN_API_PREFIX")
     aden_api_key: str = Field(default="", alias="ADEN_API_KEY")
     aden_api_secret: str = Field(default="", alias="ADEN_API_SECRET")
+
+    vest_api_base: str = Field(default="https://server-prod.hz.vestmarkets.com/v2", alias="VEST_API_BASE")
+    vest_api_key: str = Field(default="", alias="VEST_API_KEY")
+    vest_account_group: str = Field(default="", alias="VEST_ACCOUNT_GROUP")
 
     max_margin_ratio: float = Field(default=0.75, alias="MAX_MARGIN_RATIO")
     min_liq_distance_pct: float = Field(default=12.0, alias="MIN_LIQ_DISTANCE_PCT")

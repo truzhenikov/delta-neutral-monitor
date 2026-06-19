@@ -5,7 +5,11 @@ from html import escape
 COPY_BLOCK_TOTAL_LABEL = "Total"
 
 def _fmt_usd(value: float) -> str:
-    return f"{value:,.2f} USD"
+    return f"{value:.2f}".replace(".", ",") + " USD"
+
+
+def _fmt_signed_usd(value: float) -> str:
+    return f"{value:+.2f}".replace(".", ",") + " USD"
 
 
 def _real_leverage(account: dict) -> float:
@@ -31,7 +35,7 @@ def _copy_block_label(exchange: str) -> str:
     return exchange.replace("_", " ").title()
 
 
-def render_copy_block(status: dict | None) -> str:
+def build_copy_block_tsv(status: dict | None) -> str:
     if not status:
         return ""
 
@@ -51,7 +55,13 @@ def render_copy_block(status: dict | None) -> str:
 
     header_row = "\t".join(headers)
     value_row = "\t".join(values)
-    block_text = f"{header_row}\n{value_row}"
+    return f"{header_row}\n{value_row}"
+
+
+def render_copy_block(status: dict | None) -> str:
+    block_text = build_copy_block_tsv(status)
+    if not block_text:
+        return ""
     return f"<pre>{escape(block_text)}</pre>"
 
 
@@ -97,7 +107,7 @@ def render_daily_report_text(current: dict, previous: dict | None, status: dict 
     lines.extend(
         [
             f"Previous close ({previous['date']}): {_fmt_usd(previous['equity_usd'])}",
-            f"Change: {change:+,.2f} USD ({pct:+.2f}%)",
+            f"Change: {_fmt_signed_usd(change)} ({pct:+.2f}%)",
         ]
     )
     copy_block = render_copy_block(status)
@@ -117,7 +127,7 @@ def render_daily_snapshots_text(rows: list[dict]) -> str:
 
     for row in rows:
         change = row.get("change_usd")
-        change_text = "n/a" if change is None else f"{float(change):+,.2f} USD"
+        change_text = "n/a" if change is None else _fmt_signed_usd(float(change))
         lines.extend(
             [
                 f"- {row['date']}: {_fmt_usd(row['equity_usd'])}",

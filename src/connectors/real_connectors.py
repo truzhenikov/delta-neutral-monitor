@@ -1027,3 +1027,77 @@ class KucoinRealConnector(_BaseRealConnector):
             positions=positions,
             updated_at=utc_now(),
         )
+
+
+class VestRealConnector(_BaseRealConnector):
+    exchange = "vest"
+
+    def _build_headers(self, api_key: str, account_group: str) -> dict[str, str]:
+        return {
+            "X-API-KEY": api_key,
+            "xrestservermm": f"restserver{account_group}",
+            "Accept": "application/json",
+        }
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.vest_api_key
+        account_group = credentials.get("account_group") or settings.vest_account_group
+        if not (api_key and account_group):
+            raise RealConnectorNotConfiguredError(
+                "vest credentials are not configured (VEST_API_KEY/VEST_ACCOUNT_GROUP)"
+            )
+
+        payload = await self._get(
+            base_url=settings.vest_api_base,
+            path="/account",
+            params={"time": int(datetime.now(timezone.utc).timestamp() * 1000)},
+            headers=self._build_headers(api_key=api_key, account_group=account_group),
+        )
+        if not isinstance(payload, dict) or not payload:
+            raise RealConnectorRequestError(f"vest account error: {payload}")
+
+        leverage_by_symbol = {
+            str(row.get("symbol", "")): _safe_float(row.get("value"), default=0.0)
+            for row in (payload.get("leverages") or [])
+            if str(row.get("symbol", ""))
+        }
+
+        positions: list[Position] = []
+        for row in payload.get("positions") or []:
+            size_signed = _safe_float(row.get("size"))
+            if size_signed == 0:
+                continue
+
+            symbol = str(row.get("symbol") or "UNKNOWN")
+            side = "long" if bool(row.get("isLong", size_signed > 0)) else "short"
+            size = abs(size_signed)
+            mark_price = _safe_float(row.get("markPrice"))
+            entry_price = _safe_float(row.get("entryPrice"), default=mark_price)
+            leverage = leverage_by_symbol.get(symbol, 0.0)
+            if leverage <= 0:
+                init_margin_ratio = _safe_float(row.get("initMarginRatio"), default=0.0)
+                leverage = 1.0 / init_margin_ratio if init_margin_ratio > 0 else 1.0
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=symbol,
+                    side=side,
+                    size=size,
+                    entry_price=entry_price,
+                    mark_price=mark_price,
+                    leverage=leverage if leverage > 0 else 1.0,
+                    liquidation_price=_safe_liq_price(row.get("liqPrice")),
+                )
+            )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=_safe_float(payload.get("totalAccountValue")),
+            available_margin_usd=_safe_float(payload.get("withdrawable")),
+            maintenance_margin_usd=_safe_float(payload.get("totalMaintMargin")),
+            positions=positions,
+            updated_at=utc_now(),
+        )

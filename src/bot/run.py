@@ -20,6 +20,7 @@ from src.bot.command_logic import (
     toggle_alerts,
     toggle_daily_reports,
 )
+from src.bot.rendering import build_copy_block_tsv
 from src.bot.keyboards import (
     build_alert_settings_keyboard,
     build_exchange_toggle_keyboard,
@@ -168,12 +169,15 @@ async def send_due_daily_reports(bot: Any, preferences, daily_report_service, st
         return
     current, previous = report
     text = build_daily_reply({"daily_changes": [current, previous]}, status)
+    copy_block_tsv = build_copy_block_tsv(status)
     for chat_id in preferences.list_daily_report_chat_ids():
         chat_settings = preferences.get_chat(chat_id)
         if not daily_report_service.should_send(chat_settings, effective_now):
             continue
         sent = await safe_send_message(bot, chat_id, text, context="daily_report", parse_mode="HTML")
         if sent:
+            if copy_block_tsv:
+                await safe_send_message(bot, chat_id, copy_block_tsv, context="daily_report_copy_block")
             preferences.mark_daily_report_sent(chat_id, report_day_key)
 
 
@@ -297,14 +301,19 @@ async def run_bot() -> None:
         daily_report_service = get_daily_report_service()
         report = daily_report_service.build_latest_report()
         status = await collect_status_snapshot()
+        copy_block_tsv = build_copy_block_tsv(status)
         if report is None:
             await message.answer(
                 build_daily_reply({"daily_changes": []}, status),
                 parse_mode="HTML",
             )
+            if copy_block_tsv:
+                await message.answer(copy_block_tsv)
             return
         current, previous = report
         await message.answer(build_daily_reply({"daily_changes": [current, previous]}, status), parse_mode="HTML")
+        if copy_block_tsv:
+            await message.answer(copy_block_tsv)
 
     async def send_daily_snapshots_reply(message: Message) -> None:
         daily_report_service = get_daily_report_service()
