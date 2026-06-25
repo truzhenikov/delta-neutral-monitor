@@ -5,10 +5,11 @@ import collections
 import hashlib
 import hmac
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 
@@ -523,6 +524,134 @@ class AdenRealConnector(_BaseRealConnector):
 
 class MexcRealConnector(_BaseRealConnector):
     exchange = "mexc"
+
+
+class GateRealConnector(_BaseRealConnector):
+    exchange = "gate"
+
+    def _build_gate_headers(
+        self,
+        api_key: str,
+        api_secret: str,
+        method: str,
+        url: str,
+        params: dict[str, Any] | None = None,
+        body: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        query_string = urlencode(params or {})
+        body_raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False) if body else ""
+        hashed_payload = hashlib.sha512(body_raw.encode("utf-8")).hexdigest()
+        timestamp = str(time.time())
+        sign_target = urlparse(url).path
+        sign_payload = "\n".join(
+            [
+                method.upper(),
+                sign_target,
+                query_string,
+                hashed_payload,
+                timestamp,
+            ]
+        )
+        sign = hmac.new(api_secret.encode("utf-8"), sign_payload.encode("utf-8"), hashlib.sha512).hexdigest()
+        return {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "KEY": api_key,
+            "Timestamp": timestamp,
+            "SIGN": sign,
+        }
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.gate_api_key
+        api_secret = credentials.get("api_secret") or settings.gate_api_secret
+        if not (api_key and api_secret):
+            raise RealConnectorNotConfiguredError("gate credentials are not configured (GATE_API_KEY/SECRET)")
+
+        settle = (settings.gate_settle_currency or "usdt").strip().lower()
+        account_path = f"/futures/{settle}/accounts"
+        account_url = f"{settings.gate_api_base}{account_path}"
+        account_headers = self._build_gate_headers(
+            api_key=api_key,
+            api_secret=api_secret,
+            method="GET",
+            url=account_url,
+        )
+        account_payload = await self._get(
+            base_url=settings.gate_api_base,
+            path=account_path,
+            headers=account_headers,
+        )
+        if not isinstance(account_payload, dict) or not account_payload:
+            raise RealConnectorRequestError(f"gate account error: {account_payload}")
+
+        positions_path = f"/futures/{settle}/positions"
+        positions_url = f"{settings.gate_api_base}{positions_path}"
+        positions_headers = self._build_gate_headers(
+            api_key=api_key,
+            api_secret=api_secret,
+            method="GET",
+            url=positions_url,
+        )
+        positions_payload = await self._get(
+            base_url=settings.gate_api_base,
+            path=positions_path,
+            headers=positions_headers,
+        )
+        if not isinstance(positions_payload, list):
+            raise RealConnectorRequestError(f"gate positions error: {positions_payload}")
+
+        positions: list[Position] = []
+        for row in positions_payload:
+            size_signed = _safe_float(row.get("size"))
+            if size_signed == 0:
+                continue
+
+            side = "long" if size_signed > 0 else "short"
+            mark_price = _safe_float(row.get("mark_price"))
+            entry_price = _safe_float(row.get("entry_price"), default=mark_price)
+            leverage = _safe_float(row.get("leverage"), default=1.0)
+            notional_value = abs(_safe_float(row.get("value")))
+            normalized_size = abs(size_signed)
+            if notional_value > 0 and mark_price > 0:
+                normalized_size = notional_value / mark_price
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("contract") or "UNKNOWN"),
+                    side=side,
+                    size=normalized_size,
+                    entry_price=entry_price,
+                    mark_price=mark_price,
+                    leverage=leverage if leverage > 0 else 1.0,
+                    liquidation_price=_safe_liq_price(row.get("liq_price")),
+                )
+            )
+
+        maintenance_margin = _safe_float(account_payload.get("maintenance_margin"))
+        if maintenance_margin <= 0:
+            maintenance_margin = _safe_float(account_payload.get("cross_maintenance_margin"))
+        if maintenance_margin <= 0:
+            maintenance_margin = sum(_safe_float(row.get("maintenance_margin")) for row in positions_payload)
+
+        available = _safe_float(account_payload.get("available"))
+        if available <= 0:
+            available = _safe_float(account_payload.get("cross_available"))
+
+        equity = _safe_float(account_payload.get("total"))
+        if equity <= 0:
+            equity = _safe_float(account_payload.get("cross_margin_balance"))
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available,
+            maintenance_margin_usd=maintenance_margin,
+            positions=positions,
+            updated_at=utc_now(),
+        )
 
 
 class HyperliquidRealConnector(_BaseRealConnector):

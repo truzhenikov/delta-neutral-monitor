@@ -19,6 +19,13 @@ class BingxConnector(ExchangeConnector):
         return make_mock_snapshot(self.exchange, price_shift=-400)
 
 
+class GateConnector(ExchangeConnector):
+    exchange = "gate"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=310)
+
+
 class MexcConnector(ExchangeConnector):
     exchange = "mexc"
 

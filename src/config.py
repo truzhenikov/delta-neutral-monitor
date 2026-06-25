@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     bingx_api_key: str = Field(default="", alias="BINGX_API_KEY")
     bingx_api_secret: str = Field(default="", alias="BINGX_API_SECRET")
 
+    gate_api_base: str = Field(default="https://api.gateio.ws/api/v4", alias="GATE_API_BASE")
+    gate_api_key: str = Field(default="", alias="GATE_API_KEY")
+    gate_api_secret: str = Field(default="", alias="GATE_API_SECRET")
+    gate_settle_currency: str = Field(default="usdt", alias="GATE_SETTLE_CURRENCY")
+
     okx_api_base: str = Field(default="https://www.okx.com", alias="OKX_API_BASE")
     okx_api_key: str = Field(default="", alias="OKX_API_KEY")
     okx_api_secret: str = Field(default="", alias="OKX_API_SECRET")
