@@ -13,7 +13,7 @@ class StubPacificaConnector(PacificaRealConnector):
     async def _get(self, base_url: str, path: str, params=None, headers=None) -> dict:
         assert base_url == "https://api.pacifica.fi"
         assert headers is not None
-        assert headers["PF-API-KEY"] == "pac-key"
+        assert headers["Authorization"] == "Bearer pac-key"
         assert headers["Accept"] == "application/json"
         if path in {"/api/v1/account", "/api/v1/positions", "/api/v1/account/settings"}:
             assert params == {"account": "wallet-123"}

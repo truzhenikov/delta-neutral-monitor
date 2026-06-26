@@ -677,7 +677,7 @@ class PacificaRealConnector(_BaseRealConnector):
 
         headers = {
             "Accept": "application/json",
-            "PF-API-KEY": api_key,
+            "Authorization": f"Bearer {api_key}",
         }
         account_params = {"account": account}
 
