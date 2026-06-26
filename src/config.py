@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     gate_api_secret: str = Field(default="", alias="GATE_API_SECRET")
     gate_settle_currency: str = Field(default="usdt", alias="GATE_SETTLE_CURRENCY")
 
+    pacifica_api_base: str = Field(default="https://api.pacifica.fi", alias="PACIFICA_API_BASE")
+    pacifica_api_key: str = Field(default="", alias="PACIFICA_API_KEY")
+    pacifica_account: str = Field(default="", alias="PACIFICA_ACCOUNT")
+
     okx_api_base: str = Field(default="https://www.okx.com", alias="OKX_API_BASE")
     okx_api_key: str = Field(default="", alias="OKX_API_KEY")
     okx_api_secret: str = Field(default="", alias="OKX_API_SECRET")

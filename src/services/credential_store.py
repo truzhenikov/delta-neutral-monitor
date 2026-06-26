@@ -10,6 +10,7 @@ class CredentialStore:
         "bitget": ("api_key", "api_secret", "api_passphrase"),
         "bingx": ("api_key", "api_secret"),
         "gate": ("api_key", "api_secret"),
+        "pacifica": ("api_key", "account"),
         "okx": ("api_key", "api_secret", "api_passphrase"),
         "kucoin": ("api_key", "api_secret", "api_passphrase"),
         "aden": ("api_key", "api_secret"),

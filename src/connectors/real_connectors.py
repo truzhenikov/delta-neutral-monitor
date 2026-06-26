@@ -654,6 +654,119 @@ class GateRealConnector(_BaseRealConnector):
         )
 
 
+class PacificaRealConnector(_BaseRealConnector):
+    exchange = "pacifica"
+
+    @staticmethod
+    def _unwrap_success(payload: dict[str, Any], context: str) -> Any:
+        if not isinstance(payload, dict):
+            raise RealConnectorRequestError(f"pacifica {context} error: {payload}")
+        if payload.get("success") is False:
+            raise RealConnectorRequestError(f"pacifica {context} error: {payload}")
+        return payload.get("data")
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.pacifica_api_key
+        account = (credentials.get("account") or settings.pacifica_account).strip()
+        if not (api_key and account):
+            raise RealConnectorNotConfiguredError(
+                "pacifica credentials are not configured (PACIFICA_API_KEY/PACIFICA_ACCOUNT)"
+            )
+
+        headers = {
+            "Accept": "application/json",
+            "PF-API-KEY": api_key,
+        }
+        account_params = {"account": account}
+
+        account_payload = await self._get(
+            base_url=settings.pacifica_api_base,
+            path="/api/v1/account",
+            params=account_params,
+            headers=headers,
+        )
+        positions_payload = await self._get(
+            base_url=settings.pacifica_api_base,
+            path="/api/v1/positions",
+            params=account_params,
+            headers=headers,
+        )
+        settings_payload = await self._get(
+            base_url=settings.pacifica_api_base,
+            path="/api/v1/account/settings",
+            params=account_params,
+            headers=headers,
+        )
+        prices_payload = await self._get(
+            base_url=settings.pacifica_api_base,
+            path="/api/v1/info/prices",
+            headers=headers,
+        )
+        market_info_payload = await self._get(
+            base_url=settings.pacifica_api_base,
+            path="/api/v1/info",
+            headers=headers,
+        )
+
+        account_data = self._unwrap_success(account_payload, "account") or {}
+        positions_data = self._unwrap_success(positions_payload, "positions") or []
+        account_settings = self._unwrap_success(settings_payload, "account settings") or {}
+        prices_data = self._unwrap_success(prices_payload, "prices") or []
+        market_info_data = self._unwrap_success(market_info_payload, "market info") or []
+
+        leverage_by_symbol = {
+            str(item.get("symbol") or ""): _safe_float(item.get("leverage"), default=0.0)
+            for item in (account_settings.get("margin_settings") or [])
+            if str(item.get("symbol") or "")
+        }
+        mark_by_symbol = {
+            str(item.get("symbol") or ""): _safe_float(item.get("mark"), default=0.0)
+            for item in prices_data
+            if str(item.get("symbol") or "")
+        }
+        max_leverage_by_symbol = {
+            str(item.get("symbol") or ""): _safe_float(item.get("max_leverage"), default=0.0)
+            for item in market_info_data
+            if str(item.get("symbol") or "")
+        }
+
+        positions: list[Position] = []
+        for row in positions_data:
+            size = abs(_safe_float(row.get("amount")))
+            if size <= 0:
+                continue
+
+            symbol = str(row.get("symbol") or "UNKNOWN")
+            mark_price = mark_by_symbol.get(symbol) or _safe_float(row.get("mark_price"))
+            entry_price = _safe_float(row.get("entry_price"), default=mark_price)
+            leverage = leverage_by_symbol.get(symbol) or max_leverage_by_symbol.get(symbol) or 1.0
+            side = "short" if str(row.get("side", "")).lower() == "ask" else "long"
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=symbol,
+                    side=side,
+                    size=size,
+                    entry_price=entry_price,
+                    mark_price=mark_price,
+                    leverage=leverage if leverage > 0 else 1.0,
+                    liquidation_price=_safe_liq_price(row.get("liquidation_price")),
+                )
+            )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=_safe_float(account_data.get("account_equity")),
+            available_margin_usd=_safe_float(account_data.get("available_to_spend")),
+            maintenance_margin_usd=_safe_float(account_data.get("cross_mmr")),
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
 class HyperliquidRealConnector(_BaseRealConnector):
     exchange = "hyperliquid"
 
