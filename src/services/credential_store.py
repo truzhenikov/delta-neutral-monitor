@@ -9,6 +9,7 @@ class CredentialStore:
     SUPPORTED_EXCHANGES: dict[str, tuple[str, ...]] = {
         "bitget": ("api_key", "api_secret", "api_passphrase"),
         "bingx": ("api_key", "api_secret"),
+        "phemex": ("api_key", "api_secret"),
         "gate": ("api_key", "api_secret"),
         "pacifica": ("api_key", "account"),
         "okx": ("api_key", "api_secret", "api_passphrase"),

@@ -65,6 +65,7 @@ def test_build_setup_exchange_keyboard_contains_supported_exchanges() -> None:
 
     assert texts == sorted(CredentialStore.SUPPORTED_EXCHANGES)
     assert callback_data == [f"setup_exchange:{exchange}" for exchange in sorted(CredentialStore.SUPPORTED_EXCHANGES)]
+    assert "phemex" in texts
 
 
 def test_build_remove_exchange_keyboard_lists_profiles_and_cancel(tmp_path: Path) -> None:

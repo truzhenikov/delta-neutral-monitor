@@ -413,6 +413,111 @@ class BingxRealConnector(_BaseRealConnector):
         )
 
 
+class PhemexRealConnector(_BaseRealConnector):
+    exchange = "phemex"
+
+    def _build_signed_headers(self, path: str, query_string: str = "", body_raw: str = "") -> dict[str, str]:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.phemex_api_key
+        api_secret = credentials.get("api_secret") or settings.phemex_api_secret
+        if not (api_key and api_secret):
+            raise RealConnectorNotConfiguredError("phemex credentials are not configured (PHEMEX_API_KEY/SECRET)")
+
+        expiry = str(int(time.time()) + 60)
+        signature_payload = f"{path}{query_string}{expiry}{body_raw}"
+        signature = hmac.new(api_secret.encode("utf-8"), signature_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        return {
+            "x-phemex-access-token": api_key,
+            "x-phemex-request-expiry": expiry,
+            "x-phemex-request-signature": signature,
+            "Accept": "application/json",
+        }
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        currency = (settings.phemex_margin_currency or "USDT").strip().upper()
+        params = {"currency": currency}
+        query_string = urlencode(params)
+        payload = await self._get(
+            base_url=settings.phemex_api_base,
+            path="/g-accounts/accountPositions",
+            params=params,
+            headers=self._build_signed_headers("/g-accounts/accountPositions", query_string),
+        )
+        if int(payload.get("code", -1)) != 0:
+            raise RealConnectorRequestError(f"phemex accountPositions error: {payload}")
+
+        data = payload.get("data") or {}
+        account = data.get("account") or {}
+        raw_positions = data.get("positions") or []
+
+        positions: list[Position] = []
+        maintenance_margin = 0.0
+        for row in raw_positions:
+            size = abs(_safe_float(row.get("size")))
+            if size <= 0:
+                continue
+
+            side_raw = str(row.get("posSide") or row.get("side") or "").strip().lower()
+            side = "short" if side_raw in {"short", "sell"} else "long"
+            mark_price = _safe_float(row.get("markPriceRp") or row.get("markPrice"))
+            entry_price = _safe_float(row.get("avgEntryPriceRp") or row.get("avgEntryPrice"), default=mark_price)
+            leverage = _safe_float(row.get("leverageRr") or row.get("leverage"), default=1.0)
+            if leverage <= 0:
+                leverage = 1.0
+
+            maintenance_margin += _safe_float(
+                row.get("maintMarginRv")
+                or row.get("maintMarginReqRv")
+                or row.get("positionMarginRv")
+            )
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("symbol") or "UNKNOWN"),
+                    side=side,
+                    size=size,
+                    entry_price=entry_price,
+                    mark_price=mark_price,
+                    leverage=leverage,
+                    liquidation_price=_safe_liq_price(row.get("liquidationPriceRp") or row.get("liquidationPrice")),
+                )
+            )
+
+        equity = _safe_float(
+            account.get("accountBalanceRv")
+            or account.get("totalBalanceRv")
+            or account.get("equityRv")
+            or account.get("totalEquityRv")
+        )
+        available = _safe_float(
+            account.get("availableBalanceRv")
+            or account.get("totalAvailableBalanceRv")
+            or account.get("freeBalanceRv")
+        )
+        if available <= 0 and equity > 0:
+            available = max(equity - _safe_float(account.get("totalUsedBalanceRv")), 0.0)
+
+        account_maintenance = _safe_float(
+            account.get("maintMarginRv")
+            or account.get("totalMaintMarginReqRv")
+            or account.get("totalMaintenanceMarginRv")
+        )
+        if account_maintenance > 0:
+            maintenance_margin = account_maintenance
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available,
+            maintenance_margin_usd=maintenance_margin,
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
 class AdenRealConnector(_BaseRealConnector):
     exchange = "aden"
 

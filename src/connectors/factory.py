@@ -13,6 +13,7 @@ from src.connectors.mock_connectors import (
     MexcConnector,
     OkxConnector,
     PacificaConnector,
+    PhemexConnector,
     VestConnector,
 )
 from src.connectors.real_connectors import (
@@ -27,6 +28,7 @@ from src.connectors.real_connectors import (
     MexcRealConnector,
     OkxRealConnector,
     PacificaRealConnector,
+    PhemexRealConnector,
     VestRealConnector,
 )
 from src.services.credential_store import CredentialStore
@@ -35,6 +37,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenConnector,
     "bitget": BitgetConnector,
     "bingx": BingxConnector,
+    "phemex": PhemexConnector,
     "gate": GateConnector,
     "pacifica": PacificaConnector,
     "mexc": MexcConnector,
@@ -50,6 +53,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenRealConnector,
     "bitget": BitgetRealConnector,
     "bingx": BingxRealConnector,
+    "phemex": PhemexRealConnector,
     "gate": GateRealConnector,
     "pacifica": PacificaRealConnector,
     "mexc": MexcRealConnector,

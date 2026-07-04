@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     heartbeat_interval_sec: int = Field(default=3600, alias="HEARTBEAT_INTERVAL_SEC")
 
     enabled_exchanges: str = Field(
-        default="bitget,bingx,mexc,hyperliquid,extended,okx,kucoin,aden,vest,lighter", alias="ENABLED_EXCHANGES"
+        default="bitget,bingx,phemex,mexc,hyperliquid,extended,okx,kucoin,aden,vest,lighter", alias="ENABLED_EXCHANGES"
     )
 
     bitget_api_base: str = Field(default="https://api.bitget.com", alias="BITGET_API_BASE")
@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     bingx_api_base: str = Field(default="https://open-api.bingx.com", alias="BINGX_API_BASE")
     bingx_api_key: str = Field(default="", alias="BINGX_API_KEY")
     bingx_api_secret: str = Field(default="", alias="BINGX_API_SECRET")
+
+    phemex_api_base: str = Field(default="https://api.phemex.com", alias="PHEMEX_API_BASE")
+    phemex_api_key: str = Field(default="", alias="PHEMEX_API_KEY")
+    phemex_api_secret: str = Field(default="", alias="PHEMEX_API_SECRET")
+    phemex_margin_currency: str = Field(default="USDT", alias="PHEMEX_MARGIN_CURRENCY")
 
     gate_api_base: str = Field(default="https://api.gateio.ws/api/v4", alias="GATE_API_BASE")
     gate_api_key: str = Field(default="", alias="GATE_API_KEY")
