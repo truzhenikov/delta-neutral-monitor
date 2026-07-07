@@ -50,13 +50,16 @@ def test_remove_exchange_deletes_saved_credentials(tmp_path: Path) -> None:
     assert store.list_configured_exchanges() == []
 
 
-def test_unsupported_exchange_is_rejected(tmp_path: Path) -> None:
+def test_binance_and_mexc_credentials_are_supported(tmp_path: Path) -> None:
     from src.services.credential_store import CredentialStore
 
     store = CredentialStore(tmp_path / "exchanges.json")
 
-    with pytest.raises(ValueError, match="Unsupported exchange"):
-        store.set_exchange_credentials("binance", {"api_key": "bnce1234"})
+    store.set_exchange_credentials("binance", {"api_key": "bnce1234", "api_secret": "secret5678"})
+    store.set_exchange_credentials("mexc", {"api_key": "mexc1234", "api_secret": "secret9999"})
+
+    assert store.get_exchange_credentials("binance") == {"api_key": "bnce1234", "api_secret": "secret5678"}
+    assert store.get_exchange_credentials("mexc") == {"api_key": "mexc1234", "api_secret": "secret9999"}
 
 
 def test_list_exchange_statuses_returns_enabled_and_configured_state(tmp_path: Path) -> None:

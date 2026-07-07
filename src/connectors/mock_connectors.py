@@ -5,6 +5,13 @@ from src.connectors.mock_data import make_mock_snapshot
 from src.core.models import AccountSnapshot
 
 
+class BinanceConnector(ExchangeConnector):
+    exchange = "binance"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=280)
+
+
 class BitgetConnector(ExchangeConnector):
     exchange = "bitget"
 

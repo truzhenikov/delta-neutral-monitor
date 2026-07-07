@@ -4,6 +4,8 @@ import asyncio
 import hashlib
 import hmac
 
+import pytest
+
 from src.connectors.factory import build_connectors
 from src.connectors.real_connectors import PhemexRealConnector, RealConnectorNotConfiguredError
 
@@ -76,6 +78,7 @@ def test_phemex_real_connector_maps_account_snapshot(monkeypatch) -> None:
         "data": {
             "account": {
                 "accountBalanceRv": "2150.25",
+                "totalBalanceRv": "2150.25",
                 "availableBalanceRv": "1800.75",
                 "totalMaintMarginReqRv": "420.69",
             },
@@ -134,5 +137,55 @@ def test_phemex_real_connector_maps_account_snapshot(monkeypatch) -> None:
     assert eth.mark_price == 3150.0
     assert eth.leverage == 5.0
     assert eth.liquidation_price == 3900.0
+
+    get_settings.cache_clear()
+
+
+def test_phemex_real_connector_uses_balance_plus_unrealized_pnl_for_equity(monkeypatch) -> None:
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("PHEMEX_API_KEY", "phemex-key")
+    monkeypatch.setenv("PHEMEX_API_SECRET", "phemex-secret")
+    monkeypatch.setenv("PHEMEX_MARGIN_CURRENCY", "USDT")
+
+    connector = StubPhemexConnector()
+    connector._response = {
+        "code": 0,
+        "msg": "",
+        "data": {
+            "account": {
+                "accountBalanceRv": "3006.73377022",
+                "availableBalanceRv": "356.4193",
+                "totalMaintMarginReqRv": "2643.09899022",
+            },
+            "positions": [
+                {
+                    "symbol": "METAUSDT",
+                    "side": "Buy",
+                    "size": "10",
+                    "avgEntryPriceRp": "591.02364",
+                    "markPriceRp": "603.70",
+                    "leverageRr": "1",
+                    "liquidationPriceRp": "507.69",
+                },
+                {
+                    "symbol": "DRAMUSDT",
+                    "side": "Buy",
+                    "size": "120",
+                    "avgEntryPriceRp": "65.068190833",
+                    "markPriceRp": "61.13",
+                    "leverageRr": "1",
+                    "liquidationPriceRp": "52.31",
+                },
+            ],
+        },
+    }
+
+    snapshot = asyncio.run(connector.fetch_account_snapshot())
+
+    assert snapshot.equity_usd == pytest.approx(2660.91447026)
+    assert snapshot.available_margin_usd == 356.4193
+    assert snapshot.maintenance_margin_usd == 2643.09899022
 
     get_settings.cache_clear()

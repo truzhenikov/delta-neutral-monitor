@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.connectors.base import ExchangeConnector
 from src.connectors.mock_connectors import (
     AdenConnector,
+    BinanceConnector,
     BingxConnector,
     BitgetConnector,
     ExtendedConnector,
@@ -18,6 +19,7 @@ from src.connectors.mock_connectors import (
 )
 from src.connectors.real_connectors import (
     AdenRealConnector,
+    BinanceRealConnector,
     BingxRealConnector,
     BitgetRealConnector,
     ExtendedRealConnector,
@@ -35,6 +37,7 @@ from src.services.credential_store import CredentialStore
 
 MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenConnector,
+    "binance": BinanceConnector,
     "bitget": BitgetConnector,
     "bingx": BingxConnector,
     "phemex": PhemexConnector,
@@ -51,6 +54,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
 
 REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenRealConnector,
+    "binance": BinanceRealConnector,
     "bitget": BitgetRealConnector,
     "bingx": BingxRealConnector,
     "phemex": PhemexRealConnector,

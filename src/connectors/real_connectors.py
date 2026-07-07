@@ -182,6 +182,94 @@ class _BaseRealConnector(ExchangeConnector):
         )
 
 
+class BinanceRealConnector(_BaseRealConnector):
+    exchange = "binance"
+
+    def _build_signed_params(self, params: dict[str, Any] | None = None) -> tuple[dict[str, Any], dict[str, str]]:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.binance_api_key
+        api_secret = credentials.get("api_secret") or settings.binance_api_secret
+        if not (api_key and api_secret):
+            raise RealConnectorNotConfiguredError(
+                "binance credentials are not configured (BINANCE_API_KEY/SECRET)"
+            )
+
+        signed_params: dict[str, Any] = {
+            "recvWindow": 5000,
+            "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+        }
+        if params:
+            signed_params.update(params)
+        query = urlencode(sorted(signed_params.items()))
+        signature = hmac.new(api_secret.encode("utf-8"), query.encode("utf-8"), hashlib.sha256).hexdigest()
+        signed_params["signature"] = signature
+        headers = {"X-MBX-APIKEY": api_key}
+        return signed_params, headers
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        params, headers = self._build_signed_params()
+        payload = await self._get(
+            base_url=settings.binance_api_base,
+            path="/fapi/v2/account",
+            params=params,
+            headers=headers,
+        )
+
+        if not isinstance(payload, dict) or not payload:
+            raise RealConnectorRequestError(f"binance account error: {payload}")
+
+        raw_positions = payload.get("positions") or []
+        positions: list[Position] = []
+        maintenance_margin = _safe_float(payload.get("totalMaintMargin"))
+        if maintenance_margin <= 0:
+            maintenance_margin = 0.0
+
+        for row in raw_positions:
+            position_amt = _safe_float(row.get("positionAmt"))
+            if position_amt == 0:
+                continue
+            side_raw = str(row.get("positionSide") or "").upper()
+            if side_raw == "SHORT" or position_amt < 0:
+                side = "short"
+            else:
+                side = "long"
+            mark_price = _safe_float(row.get("markPrice"))
+            entry_price = _safe_float(row.get("entryPrice"), default=mark_price)
+            leverage = _safe_float(row.get("leverage"), default=1.0)
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("symbol") or "UNKNOWN"),
+                    side=side,
+                    size=abs(position_amt),
+                    entry_price=entry_price,
+                    mark_price=mark_price,
+                    leverage=leverage if leverage > 0 else 1.0,
+                    liquidation_price=_safe_liq_price(row.get("liquidationPrice")),
+                )
+            )
+            if maintenance_margin <= 0:
+                maintenance_margin += _safe_float(row.get("maintMargin"))
+
+        equity = _safe_float(payload.get("totalMarginBalance"))
+        if equity <= 0:
+            equity = _safe_float(payload.get("totalWalletBalance")) + _safe_float(payload.get("totalUnrealizedProfit"))
+        available = _safe_float(payload.get("availableBalance"))
+        if available <= 0:
+            available = _safe_float(payload.get("maxWithdrawAmount"))
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available,
+            maintenance_margin_usd=maintenance_margin,
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
 class BitgetRealConnector(_BaseRealConnector):
     exchange = "bitget"
 
@@ -486,12 +574,15 @@ class PhemexRealConnector(_BaseRealConnector):
                 )
             )
 
+        unrealized_pnl = sum(position.pnl_usd for position in positions)
+        account_balance = _safe_float(account.get("accountBalanceRv"))
         equity = _safe_float(
-            account.get("accountBalanceRv")
-            or account.get("totalBalanceRv")
+            account.get("totalEquityRv")
             or account.get("equityRv")
-            or account.get("totalEquityRv")
+            or account.get("totalBalanceRv")
         )
+        if equity <= 0 and account_balance > 0:
+            equity = account_balance + unrealized_pnl
         available = _safe_float(
             account.get("availableBalanceRv")
             or account.get("totalAvailableBalanceRv")
@@ -629,6 +720,94 @@ class AdenRealConnector(_BaseRealConnector):
 
 class MexcRealConnector(_BaseRealConnector):
     exchange = "mexc"
+
+    def _build_signed_headers(self, params: dict[str, Any] | None = None) -> dict[str, str]:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.mexc_api_key
+        api_secret = credentials.get("api_secret") or settings.mexc_api_secret
+        if not (api_key and api_secret):
+            raise RealConnectorNotConfiguredError("mexc credentials are not configured (MEXC_API_KEY/SECRET)")
+
+        request_time = str(int(datetime.now(timezone.utc).timestamp() * 1000))
+        param_string = urlencode(sorted((params or {}).items()))
+        sign_target = f"{api_key}{request_time}{param_string}"
+        signature = hmac.new(api_secret.encode("utf-8"), sign_target.encode("utf-8"), hashlib.sha256).hexdigest()
+        return {
+            "ApiKey": api_key,
+            "Request-Time": request_time,
+            "Signature": signature,
+            "Recv-Window": "5000",
+            "Content-Type": "application/json",
+        }
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        account_payload = await self._get(
+            base_url=settings.mexc_api_base,
+            path="/api/v1/private/account/assets",
+            headers=self._build_signed_headers(),
+        )
+        if not isinstance(account_payload, dict) or account_payload.get("success") is not True:
+            raise RealConnectorRequestError(f"mexc account error: {account_payload}")
+
+        positions_payload = await self._get(
+            base_url=settings.mexc_api_base,
+            path="/api/v1/private/position/open_positions",
+            headers=self._build_signed_headers(),
+        )
+        if not isinstance(positions_payload, dict) or positions_payload.get("success") is not True:
+            raise RealConnectorRequestError(f"mexc positions error: {positions_payload}")
+
+        assets = account_payload.get("data") or []
+        account = next((row for row in assets if str(row.get("currency") or "").upper() == "USDT"), None)
+        if account is None and assets:
+            account = assets[0]
+        if account is None:
+            raise RealConnectorRequestError("mexc returned empty account assets")
+
+        raw_positions = positions_payload.get("data") or []
+        positions: list[Position] = []
+        for row in raw_positions:
+            size = _safe_float(row.get("holdVol"))
+            if size <= 0:
+                continue
+            side = "short" if int(_safe_float(row.get("positionType"))) == 2 else "long"
+            mark_price = _safe_float(row.get("markPrice") or row.get("fairPrice") or row.get("holdAvgPrice"))
+            if mark_price <= 0:
+                entry_price = _safe_float(row.get("holdAvgPrice") or row.get("openAvgPrice"))
+                unrealized = _safe_float(row.get("unRealizedPnl"))
+                if size > 0:
+                    direction = -1 if side == "short" else 1
+                    mark_price = entry_price + (unrealized / (size * direction))
+            else:
+                entry_price = _safe_float(row.get("holdAvgPrice") or row.get("openAvgPrice"), default=mark_price)
+            if mark_price <= 0:
+                mark_price = entry_price
+            if entry_price <= 0:
+                entry_price = mark_price
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("symbol") or "UNKNOWN"),
+                    side=side,
+                    size=size,
+                    entry_price=entry_price,
+                    mark_price=mark_price,
+                    leverage=_safe_float(row.get("leverage"), default=1.0) or 1.0,
+                    liquidation_price=_safe_liq_price(row.get("liquidatePrice")),
+                )
+            )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=_safe_float(account.get("equity")),
+            available_margin_usd=_safe_float(account.get("availableBalance") or account.get("availableOpen")),
+            maintenance_margin_usd=_safe_float(account.get("positionMargin") or account.get("frozenBalance")),
+            positions=positions,
+            updated_at=utc_now(),
+        )
 
 
 class GateRealConnector(_BaseRealConnector):
