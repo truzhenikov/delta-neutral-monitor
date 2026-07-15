@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     heartbeat_interval_sec: int = Field(default=3600, alias="HEARTBEAT_INTERVAL_SEC")
 
     enabled_exchanges: str = Field(
-        default="binance,bitget,bingx,phemex,mexc,hyperliquid,extended,okx,kucoin,aden,vest,lighter", alias="ENABLED_EXCHANGES"
+        default="binance,bitget,bingx,phemex,mexc,hyperliquid,txflow,ondo,extended,okx,kucoin,aden,vest,lighter", alias="ENABLED_EXCHANGES"
     )
 
     binance_api_base: str = Field(default="https://fapi.binance.com", alias="BINANCE_API_BASE")
@@ -74,6 +74,16 @@ class Settings(BaseSettings):
     hyperliquid_dex: str = Field(default="", alias="HYPERLIQUID_DEX")
     hyperliquid_private_key: str = Field(default="", alias="HYPERLIQUID_PRIVATE_KEY")
     hyperliquid_read_only: bool = Field(default=True, alias="HYPERLIQUID_READ_ONLY")
+
+    txflow_api_base: str = Field(default="https://api.txflow.com", alias="TXFLOW_API_BASE")
+    txflow_user_address: str = Field(default="", alias="TXFLOW_USER_ADDRESS")
+
+    ondo_api_base: str = Field(default="https://api.ondoperps.xyz", alias="ONDO_API_BASE")
+    ondo_api_key: str = Field(default="", alias="ONDO_API_KEY")
+    ondo_api_secret: str = Field(default="", alias="ONDO_API_SECRET")
+
+    risex_api_base: str = Field(default="https://api.rise.trade", alias="RISEX_API_BASE")
+    risex_account: str = Field(default="", alias="RISEX_ACCOUNT")
 
     extended_api_base: str = Field(default="https://api.starknet.extended.exchange", alias="EXTENDED_API_BASE")
     extended_api_key: str = Field(default="", alias="EXTENDED_API_KEY")

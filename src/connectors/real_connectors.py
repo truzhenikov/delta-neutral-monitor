@@ -1186,6 +1186,236 @@ class HyperliquidRealConnector(_BaseRealConnector):
         )
 
 
+class TxflowRealConnector(_BaseRealConnector):
+    exchange = "txflow"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        user = (credentials.get("user_address") or settings.txflow_user_address).strip()
+        if not user:
+            raise RealConnectorNotConfiguredError(
+                "txflow user address is not configured (TXFLOW_USER_ADDRESS)"
+            )
+
+        state_payload = await self._post(
+            base_url=settings.txflow_api_base,
+            path="/info",
+            body={"type": "clearinghouseState", "user": user},
+            headers={"Content-Type": "application/json"},
+        )
+
+        margin_summary = state_payload.get("crossMarginSummary") or state_payload.get("marginSummary") or {}
+        positions: list[Position] = []
+        for row in state_payload.get("assetPositions") or []:
+            position_data = row.get("position") or {}
+            symbol = str(position_data.get("coin") or "").strip()
+            size_signed = _safe_float(position_data.get("szi"))
+            if not symbol or size_signed == 0:
+                continue
+
+            side = "long" if size_signed > 0 else "short"
+            size = abs(size_signed)
+            mark_price = _safe_float(position_data.get("markPx"))
+            entry_price = _safe_float(position_data.get("entryPx"), default=mark_price)
+            leverage_data = position_data.get("leverage") or {}
+            leverage = _safe_float(leverage_data.get("value"), default=1.0)
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=symbol,
+                    side=side,
+                    size=size,
+                    entry_price=entry_price,
+                    mark_price=mark_price,
+                    leverage=leverage if leverage > 0 else 1.0,
+                    liquidation_price=_safe_liq_price(position_data.get("liquidationPx")),
+                )
+            )
+
+        equity = _safe_float(margin_summary.get("accountValue"))
+        available = _safe_float(state_payload.get("withdrawable"))
+        maintenance_margin = _safe_float(
+            state_payload.get("crossMaintenanceMarginUsed"),
+            default=_safe_float(margin_summary.get("totalMarginUsed")),
+        )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available,
+            maintenance_margin_usd=maintenance_margin,
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
+class OndoRealConnector(_BaseRealConnector):
+    exchange = "ondo"
+
+    def _build_auth_headers(self, method: str, path: str, body: str = "") -> dict[str, str]:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        api_key = credentials.get("api_key") or settings.ondo_api_key
+        api_secret = credentials.get("api_secret") or settings.ondo_api_secret
+        if not (api_key and api_secret):
+            raise RealConnectorNotConfiguredError(
+                "ondo credentials are not configured (ONDO_API_KEY/ONDO_API_SECRET)"
+            )
+
+        timestamp_ms = str(int(time.time() * 1000))
+        payload = f"{timestamp_ms}{method.upper()}{path}{body}"
+        signature = hmac.new(api_secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        return {
+            "ONDO-KEY-ID": api_key,
+            "ONDO-TIMESTAMP": timestamp_ms,
+            "ONDO-SIGN": signature,
+            "Accept": "application/json",
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            ),
+        }
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        balance_payload = await self._get(
+            base_url=settings.ondo_api_base,
+            path="/v1/perps/balance",
+            headers=self._build_auth_headers("GET", "/v1/perps/balance"),
+        )
+        if balance_payload.get("success") is not True:
+            raise RealConnectorRequestError(f"ondo balance error: {balance_payload}")
+
+        positions_payload = await self._get(
+            base_url=settings.ondo_api_base,
+            path="/v1/perps/positions",
+            headers=self._build_auth_headers("GET", "/v1/perps/positions"),
+        )
+        if positions_payload.get("success") is not True:
+            raise RealConnectorRequestError(f"ondo positions error: {positions_payload}")
+
+        balance_data = balance_payload.get("result") or {}
+        raw_positions = positions_payload.get("result") or []
+
+        positions: list[Position] = []
+        for row in raw_positions:
+            side = str(row.get("direction") or "").strip().lower()
+            size = abs(_safe_float(row.get("netQuantity")))
+            if side not in {"long", "short"} or size <= 0:
+                continue
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=str(row.get("market") or "UNKNOWN"),
+                    side=side,
+                    size=size,
+                    entry_price=_safe_float(row.get("averageEntryPrice")),
+                    mark_price=_safe_float(row.get("markPrice")),
+                    leverage=_safe_float(row.get("leverage"), default=1.0),
+                    liquidation_price=_safe_liq_price(row.get("liquidationPrice")),
+                )
+            )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=_safe_float(balance_data.get("marginBalance")),
+            available_margin_usd=_safe_float(balance_data.get("availableMargin")),
+            maintenance_margin_usd=_safe_float(balance_data.get("totalMaintenanceMargin")),
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
+class RisexRealConnector(_BaseRealConnector):
+    exchange = "risex"
+
+    @staticmethod
+    def _default_headers() -> dict[str, str]:
+        return {
+            "Accept": "application/json",
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            ),
+        }
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        account = (credentials.get("account") or settings.risex_account).strip()
+        if not account:
+            raise RealConnectorNotConfiguredError(
+                "risex account is not configured (RISEX_ACCOUNT)"
+            )
+
+        headers = self._default_headers()
+        markets_payload = await self._get(
+            base_url=settings.risex_api_base,
+            path="/v1/markets",
+            headers=headers,
+        )
+        portfolio_payload = await self._get(
+            base_url=settings.risex_api_base,
+            path="/v1/portfolio/details",
+            params={"account": account},
+            headers=headers,
+        )
+
+        markets_data = ((markets_payload or {}).get("data") or {}).get("markets") or []
+        portfolio_data = (portfolio_payload or {}).get("data") or {}
+        summary = portfolio_data.get("summary") or {}
+        raw_positions = portfolio_data.get("positions") or []
+
+        market_names: dict[str, str] = {}
+        for row in markets_data:
+            market_id = str(row.get("market_id") or "").strip()
+            display_name = str(row.get("display_name") or row.get("base_asset_symbol") or "").strip()
+            if market_id and display_name:
+                market_names[market_id] = display_name
+
+        positions: list[Position] = []
+        for row in raw_positions:
+            raw_size = _safe_float(row.get("size"))
+            size = abs(raw_size)
+            if size <= 0:
+                continue
+
+            side_value = str(row.get("side") or "").strip().upper()
+            if side_value in {"0", "BUY", "LONG"}:
+                side = "long"
+            elif side_value in {"1", "SELL", "SHORT"}:
+                side = "short"
+            else:
+                side = "short" if raw_size < 0 else "long"
+
+            market_id = str(row.get("market_id") or "").strip()
+            symbol = str(row.get("market_name") or "").strip() or market_names.get(market_id) or "UNKNOWN"
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=symbol,
+                    side=side,
+                    size=size,
+                    entry_price=_safe_float(row.get("avg_entry_price")),
+                    mark_price=_safe_float(row.get("mark_price")),
+                    leverage=_safe_float(row.get("leverage"), default=1.0),
+                    liquidation_price=_safe_liq_price(row.get("liquidation_price")),
+                )
+            )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=_safe_float(summary.get("total_account_value")),
+            available_margin_usd=_safe_float(summary.get("free_collateral")),
+            maintenance_margin_usd=_safe_float(summary.get("total_maintenance_margin")),
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
 class ExtendedRealConnector(_BaseRealConnector):
     exchange = "extended"
 

@@ -61,6 +61,27 @@ class HyperliquidConnector(ExchangeConnector):
         return make_mock_snapshot(self.exchange, price_shift=620)
 
 
+class TxflowConnector(ExchangeConnector):
+    exchange = "txflow"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=410)
+
+
+class OndoConnector(ExchangeConnector):
+    exchange = "ondo"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=155)
+
+
+class RisexConnector(ExchangeConnector):
+    exchange = "risex"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=205)
+
+
 class ExtendedConnector(ExchangeConnector):
     exchange = "extended"
 
