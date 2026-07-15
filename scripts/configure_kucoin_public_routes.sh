@@ -2,7 +2,11 @@
 set -euo pipefail
 
 HOST="${KUCOIN_ROUTE_HOST:-api-futures.kucoin.com}"
-IFACE="${KUCOIN_ROUTE_IFACE:-ens3}"
+IFACE="${KUCOIN_ROUTE_IFACE:-}"
+
+if [[ -z "$IFACE" ]]; then
+  IFACE="$(ip route show default | awk '{for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}')"
+fi
 
 GATEWAY="$(ip route show default | awk -v iface="$IFACE" '$0 ~ (" dev " iface " ") || $0 ~ (" dev " iface "$") {for (i = 1; i <= NF; i++) if ($i == "via") {print $(i + 1); exit}}')"
 if [[ -z "$GATEWAY" ]]; then
