@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import base64
+import json
 import re
 from datetime import datetime, timedelta, timezone
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from src.core.schemas import StatusOut
+
+if TYPE_CHECKING:
+    from src.services.credential_store import CredentialStore
 
 
 class AlertMessage(NamedTuple):
@@ -16,6 +21,7 @@ class AlertingService:
     def __init__(self, cooldown_sec: int) -> None:
         self.cooldown = timedelta(seconds=max(cooldown_sec, 0))
         self._last_sent_at: dict[str, datetime] = {}
+        self._sticky_sent_keys: set[str] = set()
 
     def collect_alert_messages(self, status: StatusOut) -> list[str]:
         return [item.text for item in self.collect_pending_alerts(status)]
@@ -50,6 +56,58 @@ class AlertingService:
             key = f"connector:{conn.exchange}:{error_text}"
             if self._is_due(key, now):
                 messages.append(AlertMessage(key=key, text=f"CONNECTOR ALERT [{conn.exchange}]: {error_text}"))
+
+        return messages
+
+    def collect_pending_token_expiry_alerts(
+        self,
+        credential_store: CredentialStore,
+        *,
+        now: datetime | None = None,
+        warning_window: timedelta = timedelta(hours=24),
+    ) -> list[AlertMessage]:
+        effective_now = now or datetime.now(timezone.utc)
+        messages: list[AlertMessage] = []
+
+        for entry in credential_store.list_configured_exchanges():
+            if entry.get("base_exchange") != "variational" or not entry.get("enabled"):
+                continue
+            exchange_ref = str(entry.get("exchange") or "").strip().lower()
+            raw_token = credential_store.get_exchange_credentials(exchange_ref).get("vr_token", "")
+            expires_at = self._decode_jwt_expiry(raw_token)
+            if expires_at is None:
+                continue
+
+            exp_ts = int(expires_at.timestamp())
+            exp_utc = expires_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            remaining = expires_at - effective_now
+            expiring_key = f"token:{exchange_ref}:expiring:{exp_ts}"
+            expired_key = f"token:{exchange_ref}:expired:{exp_ts}"
+
+            if remaining <= timedelta(0):
+                self._sticky_sent_keys.discard(expiring_key)
+                if expired_key not in self._sticky_sent_keys:
+                    messages.append(
+                        AlertMessage(
+                            key=expired_key,
+                            text=f"TOKEN EXPIRED [{exchange_ref}]: Variational vr-token expired at {exp_utc}. Update the token in the bot.",
+                        )
+                    )
+                continue
+
+            self._sticky_sent_keys.discard(expired_key)
+            if remaining <= warning_window and expiring_key not in self._sticky_sent_keys:
+                hours_left = int(remaining.total_seconds() // 3600)
+                minutes_left = int((remaining.total_seconds() % 3600) // 60)
+                messages.append(
+                    AlertMessage(
+                        key=expiring_key,
+                        text=(
+                            f"TOKEN EXPIRING [{exchange_ref}]: Variational vr-token expires at {exp_utc} "
+                            f"(in {hours_left}h {minutes_left}m)."
+                        ),
+                    )
+                )
 
         return messages
 
@@ -112,8 +170,23 @@ class AlertingService:
         normalized = error_text.lower()
         return "not configured" in normalized or "credentials are not configured" in normalized
 
+    @staticmethod
+    def _decode_jwt_expiry(raw_token: str) -> datetime | None:
+        try:
+            parts = raw_token.split(".")
+            if len(parts) < 2:
+                return None
+            payload = parts[1] + ("=" * (-len(parts[1]) % 4))
+            decoded = json.loads(base64.urlsafe_b64decode(payload).decode("utf-8"))
+            exp = int(decoded.get("exp"))
+            return datetime.fromtimestamp(exp, tz=timezone.utc)
+        except Exception:
+            return None
+
     def mark_sent(self, key: str, sent_at: datetime | None = None) -> None:
         self._last_sent_at[key] = sent_at or datetime.now(timezone.utc)
+        if key.startswith("token:"):
+            self._sticky_sent_keys.add(key)
 
     def _is_due(self, key: str, now: datetime) -> bool:
         prev = self._last_sent_at.get(key)

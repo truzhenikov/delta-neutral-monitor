@@ -23,6 +23,7 @@ class CredentialStore:
         "txflow": ("user_address",),
         "ondo": ("api_key", "api_secret"),
         "risex": ("account",),
+        "variational": ("vr_token",),
         "extended": ("api_key", "stark_key_public", "stark_key_private", "vault_number", "client_id"),
     }
     PROFILE_SEPARATOR = ":"

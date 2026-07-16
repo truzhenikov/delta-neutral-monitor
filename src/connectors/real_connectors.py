@@ -1416,6 +1416,121 @@ class RisexRealConnector(_BaseRealConnector):
         )
 
 
+class VariationalRealConnector(_BaseRealConnector):
+    exchange = "variational"
+
+    @staticmethod
+    def _extract_address_from_token(vr_token: str) -> str:
+        try:
+            payload = vr_token.split(".")[1]
+            padding = "=" * (-len(payload) % 4)
+            decoded = json.loads(base64.urlsafe_b64decode(payload + padding).decode("utf-8"))
+            return str(decoded.get("address") or "").strip().lower()
+        except Exception:
+            return ""
+
+    @classmethod
+    def _default_headers(cls, vr_token: str) -> dict[str, str]:
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            ),
+            "Origin": "https://omni.variational.io",
+            "Referer": "https://omni.variational.io/",
+            "Cookie": f"vr-token={vr_token}",
+        }
+        address = cls._extract_address_from_token(vr_token)
+        if address:
+            headers["vr-connected-address"] = address
+        return headers
+
+    @staticmethod
+    def _instrument_symbol(row: dict, info: dict) -> str:
+        instrument = info.get("instrument") or row.get("instrument") or {}
+        if isinstance(instrument, dict):
+            underlying = str(instrument.get("underlying") or "").strip().upper()
+            instrument_type = str(instrument.get("instrument_type") or "").strip().lower()
+            if underlying and instrument_type == "perpetual_future":
+                return f"{underlying}-PERP"
+            if underlying:
+                return underlying
+        if isinstance(instrument, str) and instrument.strip():
+            return instrument.strip()
+        return "UNKNOWN"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        vr_token = (credentials.get("vr_token") or settings.variational_vr_token).strip()
+        if not vr_token:
+            raise RealConnectorNotConfiguredError(
+                "variational vr-token is not configured (VARIATIONAL_VR_TOKEN)"
+            )
+
+        headers = self._default_headers(vr_token)
+        portfolio = await self._get(
+            base_url=settings.variational_api_base,
+            path="/api/portfolio",
+            params={"compute_margin": "true"},
+            headers=headers,
+        )
+        raw_positions = await self._get(
+            base_url=settings.variational_api_base,
+            path="/api/positions",
+            headers=headers,
+        )
+
+        portfolio = portfolio if isinstance(portfolio, dict) else {}
+        margin_usage = portfolio.get("margin_usage") or {}
+        positions_payload = raw_positions if isinstance(raw_positions, list) else []
+
+        equity = _safe_float(portfolio.get("balance")) + _safe_float(portfolio.get("upnl"))
+        initial_margin = _safe_float(margin_usage.get("initial_margin"))
+        maintenance_margin = _safe_float(margin_usage.get("maintenance_margin"))
+        available_margin = max(0.0, equity - initial_margin)
+
+        positions: list[Position] = []
+        for row in positions_payload:
+            if not isinstance(row, dict):
+                continue
+            info = row.get("position_info") or {}
+            raw_qty = _safe_float(info.get("qty"))
+            size = abs(raw_qty)
+            if size <= 0:
+                continue
+
+            side = "short" if raw_qty < 0 else "long"
+            mark_price = _safe_float((row.get("price_info") or {}).get("price") or row.get("mark_px"))
+            notional_value = abs(_safe_float(row.get("value")))
+            leverage = notional_value / equity if equity > 0 else 0.0
+
+            positions.append(
+                Position(
+                    exchange=self.exchange,
+                    symbol=self._instrument_symbol(row, info),
+                    side=side,
+                    size=size,
+                    entry_price=_safe_float(info.get("avg_entry_price") or row.get("average_open_price")),
+                    mark_price=mark_price,
+                    leverage=leverage,
+                    liquidation_price=_safe_liq_price(
+                        row.get("estimated_liquidation_price") or info.get("liquidation_px") or row.get("liquidation_px")
+                    ),
+                )
+            )
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available_margin,
+            maintenance_margin_usd=maintenance_margin,
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
 class ExtendedRealConnector(_BaseRealConnector):
     exchange = "extended"
 

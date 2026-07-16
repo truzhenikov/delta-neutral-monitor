@@ -14,6 +14,7 @@ FIELD_LABELS: dict[tuple[str, str], str] = {
     ("ondo", "api_key"): "api key",
     ("ondo", "api_secret"): "api secret",
     ("risex", "account"): "wallet address",
+    ("variational", "vr_token"): "vr-token",
     ("pacifica", "account"): "wallet address",
     ("vest", "account_group"): "account group",
     ("lighter", "l1_address"): "wallet address",

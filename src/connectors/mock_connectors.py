@@ -82,6 +82,13 @@ class RisexConnector(ExchangeConnector):
         return make_mock_snapshot(self.exchange, price_shift=205)
 
 
+class VariationalConnector(ExchangeConnector):
+    exchange = "variational"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=265)
+
+
 class ExtendedConnector(ExchangeConnector):
     exchange = "extended"
 

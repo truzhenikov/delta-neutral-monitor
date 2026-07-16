@@ -139,11 +139,18 @@ async def send_alerts_for_snapshot(
     preferences,
     alerting_service,
     bootstrap_chat_id: str = "",
+    credential_store=None,
+    now: datetime | None = None,
 ) -> None:
     chat_ids = resolve_alert_chat_ids(preferences, bootstrap_chat_id=bootstrap_chat_id)
     if not chat_ids:
         return
     delivered_keys: set[str] = set()
+    credential_store = credential_store or get_credential_store()
+    token_alerts = alerting_service.collect_pending_token_expiry_alerts(
+        credential_store,
+        now=now,
+    )
     for chat_id in chat_ids:
         chat_settings = preferences.get_chat(chat_id)
         liq_threshold = float(chat_settings.get("alert_min_liq_distance_pct", 12.0))
@@ -151,6 +158,7 @@ async def send_alerts_for_snapshot(
             snapshot,
             min_liq_distance_pct=liq_threshold,
         )
+        pending_alerts.extend(token_alerts)
         for alert in pending_alerts:
             sent = await safe_send_message(bot, chat_id, alert.text, context="alert")
             if sent:

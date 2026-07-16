@@ -18,6 +18,7 @@ from src.connectors.mock_connectors import (
     PhemexConnector,
     RisexConnector,
     TxflowConnector,
+    VariationalConnector,
     VestConnector,
 )
 from src.connectors.real_connectors import (
@@ -37,6 +38,7 @@ from src.connectors.real_connectors import (
     PhemexRealConnector,
     RisexRealConnector,
     TxflowRealConnector,
+    VariationalRealConnector,
     VestRealConnector,
 )
 from src.services.credential_store import CredentialStore
@@ -54,6 +56,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "txflow": TxflowConnector,
     "ondo": OndoConnector,
     "risex": RisexConnector,
+    "variational": VariationalConnector,
     "extended": ExtendedConnector,
     "okx": OkxConnector,
     "kucoin": KucoinConnector,
@@ -74,6 +77,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "txflow": TxflowRealConnector,
     "ondo": OndoRealConnector,
     "risex": RisexRealConnector,
+    "variational": VariationalRealConnector,
     "extended": ExtendedRealConnector,
     "okx": OkxRealConnector,
     "kucoin": KucoinRealConnector,

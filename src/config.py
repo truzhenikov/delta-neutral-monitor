@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     risex_api_base: str = Field(default="https://api.rise.trade", alias="RISEX_API_BASE")
     risex_account: str = Field(default="", alias="RISEX_ACCOUNT")
 
+    variational_api_base: str = Field(default="https://omni.variational.io", alias="VARIATIONAL_API_BASE")
+    variational_vr_token: str = Field(default="", alias="VARIATIONAL_VR_TOKEN")
+
     extended_api_base: str = Field(default="https://api.starknet.extended.exchange", alias="EXTENDED_API_BASE")
     extended_api_key: str = Field(default="", alias="EXTENDED_API_KEY")
     extended_stark_key_public: str = Field(default="", alias="EXTENDED_STARK_KEY_PUBLIC")
