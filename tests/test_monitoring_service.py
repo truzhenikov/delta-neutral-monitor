@@ -130,7 +130,7 @@ def test_monitoring_service_caps_slow_connector_wait_and_reuses_cached_snapshot(
     service = MonitoringService([connector], cache_path=tmp_path / "latest-accounts.json")
 
     get_settings.cache_clear()
-    monkeypatch.setenv("REQUEST_TIMEOUT_SEC", "0.01")
+    monkeypatch.setenv("CONNECTOR_TIMEOUT_SEC", "0.01")
 
     first_accounts, first_statuses = asyncio.run(service.collect_with_status())
     second_accounts, second_statuses = asyncio.run(asyncio.wait_for(service.collect_with_status(), timeout=0.03))
@@ -142,6 +142,21 @@ def test_monitoring_service_caps_slow_connector_wait_and_reuses_cached_snapshot(
     assert second_accounts[0].updated_at == datetime(2026, 5, 19, 11, 0, tzinfo=timezone.utc)
     assert second_statuses[0].ok is False
     assert "timeout" in second_statuses[0].error.lower()
+
+
+def test_monitoring_service_uses_separate_connector_timeout(monkeypatch) -> None:
+    connector = SuccessThenSlowConnector()
+    connector.calls = 1
+    service = MonitoringService([connector])
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("REQUEST_TIMEOUT_SEC", "0.01")
+    monkeypatch.setenv("CONNECTOR_TIMEOUT_SEC", "0.1")
+
+    accounts, statuses = asyncio.run(service.collect_with_status())
+
+    assert [account.exchange for account in accounts] == ["extended"]
+    assert statuses[0].ok is True
 
 
 def test_monitoring_service_reuses_live_snapshot_within_ttl(tmp_path: Path) -> None:

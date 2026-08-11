@@ -42,7 +42,7 @@ class MonitoringService:
         now = time.monotonic()
         if self._result_cache is not None and now < self._result_cache_expires_at:
             return self._result_cache
-        timeout_sec = get_settings().request_timeout_sec
+        timeout_sec = get_settings().connector_timeout_sec
         results = await asyncio.gather(
             *(asyncio.wait_for(self._fetch_with_retry(c), timeout=timeout_sec) for c in self.connectors),
             return_exceptions=True,
