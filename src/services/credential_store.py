@@ -19,6 +19,7 @@ class CredentialStore:
         "aden": ("api_key", "api_secret"),
         "vest": ("api_key", "account_group"),
         "lighter": ("account_index", "l1_address"),
+        "nado": ("wallet_address", "subaccount_name"),
         "hyperliquid": ("user_address",),
         "txflow": ("user_address",),
         "ondo": ("api_key", "api_secret"),

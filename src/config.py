@@ -114,6 +114,11 @@ class Settings(BaseSettings):
     lighter_account_index: str = Field(default="", alias="LIGHTER_ACCOUNT_INDEX")
     lighter_l1_address: str = Field(default="", alias="LIGHTER_L1_ADDRESS")
 
+    nado_gateway_api_base: str = Field(default="https://gateway.prod.nado.xyz/v1", alias="NADO_GATEWAY_API_BASE")
+    nado_archive_api_base: str = Field(default="https://archive.prod.nado.xyz/v1", alias="NADO_ARCHIVE_API_BASE")
+    nado_wallet_address: str = Field(default="", alias="NADO_WALLET_ADDRESS")
+    nado_subaccount_name: str = Field(default="default", alias="NADO_SUBACCOUNT_NAME")
+
     max_margin_ratio: float = Field(default=0.75, alias="MAX_MARGIN_RATIO")
     min_liq_distance_pct: float = Field(default=12.0, alias="MIN_LIQ_DISTANCE_PCT")
     max_abs_net_delta_usd: float = Field(default=500.0, alias="MAX_ABS_NET_DELTA_USD")

@@ -29,6 +29,7 @@ Current runtime integrations in this repo target futures accounts for:
 - OKX
 - KuCoin Futures
 - ADEN
+- Nado (public read-only account queries; no private key required)
 
 ## No demo mode
 
@@ -75,6 +76,8 @@ Fill in the exchange credentials you actually use. At minimum, configure:
 - `ENABLED_EXCHANGES`
 - the API credentials for those exchanges
 - optionally Telegram variables if you want alerts/bot control
+
+For Nado, set `NADO_WALLET_ADDRESS` and, if needed, `NADO_SUBACCOUNT_NAME` (defaults to `default`). The connector only uses public Gateway and Archive queries; do not provide a private key.
 
 > The sample file intentionally does **not** enable any demo/mock runtime mode.
 

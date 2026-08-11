@@ -7,6 +7,7 @@ import hmac
 import json
 import time
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode, urlparse
@@ -48,6 +49,28 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 def _safe_liq_price(value: Any) -> float | None:
     val = _safe_float(value, default=0.0)
     return val if val > 0 else None
+
+
+def _nado_subaccount_hex(wallet_address: str, subaccount_name: str = "default") -> str:
+    wallet = wallet_address.strip().lower()
+    if len(wallet) != 42 or not wallet.startswith("0x"):
+        raise ValueError("Nado wallet address must be a 20-byte 0x-prefixed EVM address")
+    try:
+        wallet_bytes = bytes.fromhex(wallet[2:])
+    except ValueError as exc:
+        raise ValueError("Nado wallet address must contain hexadecimal characters only") from exc
+
+    name_bytes = subaccount_name.strip().encode("utf-8")
+    if not name_bytes or len(name_bytes) > 12:
+        raise ValueError("Nado subaccount name must contain between 1 and 12 UTF-8 bytes")
+    return "0x" + (wallet_bytes + name_bytes.ljust(12, b"\x00")).hex()
+
+
+def _nado_decimal(value: Any) -> Decimal:
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal(0)
 
 
 def _hyperliquid_build_spot_graph(
@@ -2068,6 +2091,187 @@ class LighterRealConnector(_BaseRealConnector):
             equity_usd=equity,
             available_margin_usd=_safe_float(account.get("available_balance")),
             maintenance_margin_usd=maintenance,
+            positions=positions,
+            updated_at=utc_now(),
+        )
+
+
+class NadoRealConnector(_BaseRealConnector):
+    exchange = "nado"
+    _X18 = 10**18
+
+    @classmethod
+    def _health_metrics(cls, healths: Any) -> tuple[float, float, float]:
+        if not isinstance(healths, list) or len(healths) < 3:
+            return 0.0, 0.0, 0.0
+        scale = Decimal(cls._X18)
+        initial_health = float(_nado_decimal((healths[0] or {}).get("health")) / scale)
+        maintenance_health = float(_nado_decimal((healths[1] or {}).get("health")) / scale)
+        equity = float(_nado_decimal((healths[2] or {}).get("health")) / scale)
+        return equity, max(initial_health, 0.0), max(equity - maintenance_health, 0.0)
+
+    def _unwrap_query(self, payload: Any, label: str) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise RealConnectorRequestError(f"nado {label} returned malformed payload")
+        if payload.get("status") not in (None, "success"):
+            raise RealConnectorRequestError(f"nado {label} error: {payload}")
+        data = payload.get("data", payload)
+        if not isinstance(data, dict):
+            raise RealConnectorRequestError(f"nado {label} returned malformed data")
+        return data
+
+    def _symbol_map(self, payload: Any) -> dict[int, str]:
+        rows = payload
+        if isinstance(payload, dict):
+            if payload.get("status") not in (None, "success"):
+                raise RealConnectorRequestError(f"nado symbols error: {payload}")
+            rows = payload.get("data", payload.get("symbols", []))
+        if isinstance(rows, dict):
+            rows = rows.get("symbols", [])
+        if not isinstance(rows, list):
+            raise RealConnectorRequestError("nado symbols returned malformed data")
+
+        result: dict[int, str] = {}
+        for row in rows:
+            if not isinstance(row, dict) or str(row.get("type", "")).lower() != "perp":
+                continue
+            product_id = int(_safe_float(row.get("product_id"), default=-1))
+            symbol = str(row.get("symbol") or "").strip()
+            if product_id >= 0 and symbol:
+                result[product_id] = symbol
+        return result
+
+    def _mark_prices(self, payload: Any) -> dict[int, float]:
+        data = payload
+        if isinstance(payload, dict) and payload.get("status") is not None:
+            if payload.get("status") != "success":
+                raise RealConnectorRequestError(f"nado perp prices error: {payload}")
+            data = payload.get("data", {})
+        if not isinstance(data, dict):
+            raise RealConnectorRequestError("nado perp prices returned malformed data")
+
+        result: dict[int, float] = {}
+        for key, row in data.items():
+            if not isinstance(row, dict):
+                continue
+            product_id = int(_safe_float(row.get("product_id", key), default=-1))
+            mark_price = float(_nado_decimal(row.get("mark_price_x18")) / Decimal(self._X18))
+            if product_id >= 0 and mark_price > 0:
+                result[product_id] = mark_price
+        return result
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        settings = get_settings()
+        credentials = _runtime_credentials(self.exchange)
+        wallet_address = (credentials.get("wallet_address") or settings.nado_wallet_address).strip()
+        subaccount_name = (credentials.get("subaccount_name") or settings.nado_subaccount_name).strip()
+        if not wallet_address:
+            raise RealConnectorNotConfiguredError(
+                "nado wallet address is not configured (NADO_WALLET_ADDRESS)"
+            )
+        try:
+            subaccount = _nado_subaccount_hex(wallet_address, subaccount_name)
+        except ValueError as exc:
+            raise RealConnectorNotConfiguredError(f"nado account identifier is invalid: {exc}") from exc
+
+        headers = {"accept": "application/json", "accept-encoding": "gzip"}
+        account_payload = await self._get(
+            base_url=settings.nado_gateway_api_base,
+            path="/query",
+            params={"type": "subaccount_info", "subaccount": subaccount},
+            headers=headers,
+        )
+        account = self._unwrap_query(account_payload, "subaccount_info")
+        if account.get("exists") is False:
+            raise RealConnectorRequestError(
+                f"nado subaccount {subaccount_name!r} does not exist for the configured wallet"
+            )
+
+        isolated_payload = await self._get(
+            base_url=settings.nado_gateway_api_base,
+            path="/query",
+            params={"type": "isolated_positions", "subaccount": subaccount},
+            headers=headers,
+        )
+        isolated_data = self._unwrap_query(isolated_payload, "isolated_positions")
+
+        balance_rows: list[dict[str, Any]] = [
+            row for row in (account.get("perp_balances") or []) if isinstance(row, dict)
+        ]
+        health_groups: list[Any] = [account.get("healths")]
+        for isolated in isolated_data.get("isolated_positions") or []:
+            if not isinstance(isolated, dict):
+                continue
+            health_groups.append(isolated.get("healths"))
+            base_balance = isolated.get("base_balance")
+            if isinstance(base_balance, dict):
+                balance_rows.append(base_balance)
+
+        active_rows: list[tuple[int, float, float]] = []
+        for row in balance_rows:
+            nested_balance = row.get("balance")
+            balance: dict[str, Any] = nested_balance if isinstance(nested_balance, dict) else row
+            amount_x18 = _nado_decimal(balance.get("amount"))
+            if amount_x18 == 0:
+                continue
+            product_id = int(_safe_float(row.get("product_id", balance.get("product_id")), default=-1))
+            if product_id < 0:
+                continue
+            amount = amount_x18 / Decimal(self._X18)
+            v_quote = _nado_decimal(balance.get("v_quote_balance")) / Decimal(self._X18)
+            entry_price = abs(-v_quote / amount) if amount else Decimal(0)
+            active_rows.append((product_id, float(amount), float(entry_price)))
+
+        symbols_payload = await self._get(
+            base_url=settings.nado_gateway_api_base,
+            path="/symbols",
+            headers=headers,
+        )
+        symbols = self._symbol_map(symbols_payload)
+
+        product_ids = sorted({product_id for product_id, _, _ in active_rows})
+        marks: dict[int, float] = {}
+        if product_ids:
+            prices_payload = await self._post(
+                base_url=settings.nado_archive_api_base,
+                path="",
+                body={"perp_prices": {"product_ids": product_ids}},
+                headers={
+                    "content-type": "application/json",
+                    "accept": "application/json",
+                    "accept-encoding": "gzip",
+                },
+            )
+            marks = self._mark_prices(prices_payload)
+
+        positions = [
+            Position(
+                exchange=self.exchange,
+                symbol=symbols.get(product_id, f"PRODUCT-{product_id}-PERP"),
+                side="long" if amount > 0 else "short",
+                size=abs(amount),
+                entry_price=entry_price,
+                mark_price=marks.get(product_id, entry_price),
+                leverage=1.0,
+                liquidation_price=None,
+            )
+            for product_id, amount, entry_price in active_rows
+        ]
+
+        equity = 0.0
+        available = 0.0
+        maintenance_margin = 0.0
+        for healths in health_groups:
+            group_equity, group_available, group_maintenance = self._health_metrics(healths)
+            equity += group_equity
+            available += group_available
+            maintenance_margin += group_maintenance
+
+        return AccountSnapshot(
+            exchange=self.exchange,
+            equity_usd=equity,
+            available_margin_usd=available,
+            maintenance_margin_usd=maintenance_margin,
             positions=positions,
             updated_at=utc_now(),
         )

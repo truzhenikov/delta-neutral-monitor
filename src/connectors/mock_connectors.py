@@ -129,3 +129,10 @@ class LighterConnector(ExchangeConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         return make_mock_snapshot(self.exchange, price_shift=95)
+
+
+class NadoConnector(ExchangeConnector):
+    exchange = "nado"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=115)
