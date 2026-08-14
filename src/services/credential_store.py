@@ -266,6 +266,7 @@ class CredentialStore:
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = self.storage_path.with_suffix(self.storage_path.suffix + ".tmp")
         tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        tmp_path.chmod(0o600)
         tmp_path.replace(self.storage_path)
 
     def _display_value(self, key: str, value: str) -> str:

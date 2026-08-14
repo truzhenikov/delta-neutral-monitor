@@ -139,3 +139,13 @@ def test_list_exchange_statuses_includes_profiled_entries(tmp_path: Path) -> Non
     assert statuses["hyperliquid:main"]["base_exchange"] == "hyperliquid"
     assert statuses["hyperliquid:main"]["profile_name"] == "main"
     assert statuses["hyperliquid:main"]["credentials"] == {"user_address": "*****"}
+
+
+def test_credential_store_file_is_owner_only(tmp_path: Path) -> None:
+    from src.services.credential_store import CredentialStore
+
+    storage_path = tmp_path / "exchanges.json"
+    store = CredentialStore(storage_path)
+    store.set_exchange_credentials("aden", {"api_key": "akey1234", "api_secret": "secret456"})
+
+    assert storage_path.stat().st_mode & 0o777 == 0o600
