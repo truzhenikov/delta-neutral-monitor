@@ -19,6 +19,8 @@ FIELD_LABELS: dict[tuple[str, str], str] = {
     ("vest", "account_group"): "account group",
     ("lighter", "l1_address"): "wallet address",
     ("lighter", "account_index"): "account index",
+    ("lighter-rh", "l1_address"): "wallet address",
+    ("lighter-rh", "account_index"): "account index",
     ("nado", "wallet_address"): "wallet address",
     ("nado", "subaccount_name"): "subaccount name (for example default)",
 }
