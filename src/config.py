@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     heartbeat_interval_sec: int = Field(default=3600, alias="HEARTBEAT_INTERVAL_SEC")
 
     enabled_exchanges: str = Field(
-        default="binance,bitget,bingx,phemex,mexc,hyperliquid,txflow,ondo,extended,okx,kucoin,aden,vest,lighter", alias="ENABLED_EXCHANGES"
+        default="binance,bitget,bingx,phemex,mexc,hyperliquid,txflow,ondo,extended,okx,kucoin,aden,vest,lighter,lighter-rh", alias="ENABLED_EXCHANGES"
     )
 
     binance_api_base: str = Field(default="https://fapi.binance.com", alias="BINANCE_API_BASE")
@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     lighter_api_base: str = Field(default="https://mainnet.zklighter.elliot.ai", alias="LIGHTER_API_BASE")
     lighter_account_index: str = Field(default="", alias="LIGHTER_ACCOUNT_INDEX")
     lighter_l1_address: str = Field(default="", alias="LIGHTER_L1_ADDRESS")
+
+    lighter_rh_api_base: str = Field(default="https://api.rh.lighter.xyz", alias="LIGHTER_RH_API_BASE")
+    lighter_rh_account_index: str = Field(default="", alias="LIGHTER_RH_ACCOUNT_INDEX")
+    lighter_rh_l1_address: str = Field(default="", alias="LIGHTER_RH_L1_ADDRESS")
 
     nado_gateway_api_base: str = Field(default="https://gateway.prod.nado.xyz/v1", alias="NADO_GATEWAY_API_BASE")
     nado_archive_api_base: str = Field(default="https://archive.prod.nado.xyz/v1", alias="NADO_ARCHIVE_API_BASE")

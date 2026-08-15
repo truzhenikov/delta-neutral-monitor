@@ -11,6 +11,7 @@ from src.connectors.mock_connectors import (
     HyperliquidConnector,
     KucoinConnector,
     LighterConnector,
+    LighterRHConnector,
     MexcConnector,
     NadoConnector,
     OndoConnector,
@@ -32,6 +33,7 @@ from src.connectors.real_connectors import (
     HyperliquidRealConnector,
     KucoinRealConnector,
     LighterRealConnector,
+    LighterRHRealConnector,
     MexcRealConnector,
     NadoRealConnector,
     OndoRealConnector,
@@ -64,6 +66,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "kucoin": KucoinConnector,
     "vest": VestConnector,
     "lighter": LighterConnector,
+    "lighter-rh": LighterRHConnector,
     "nado": NadoConnector,
 }
 
@@ -86,6 +89,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "kucoin": KucoinRealConnector,
     "vest": VestRealConnector,
     "lighter": LighterRealConnector,
+    "lighter-rh": LighterRHRealConnector,
     "nado": NadoRealConnector,
 }
 

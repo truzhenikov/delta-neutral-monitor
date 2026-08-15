@@ -1999,6 +1999,11 @@ class VestRealConnector(_BaseRealConnector):
 
 class LighterRealConnector(_BaseRealConnector):
     exchange = "lighter"
+    api_base_setting = "lighter_api_base"
+    account_index_setting = "lighter_account_index"
+    l1_address_setting = "lighter_l1_address"
+    account_index_env = "LIGHTER_ACCOUNT_INDEX"
+    l1_address_env = "LIGHTER_L1_ADDRESS"
 
     async def _resolve_account_index(self, base_url: str, l1_address: str) -> str:
         payload = await self._get(
@@ -2024,17 +2029,19 @@ class LighterRealConnector(_BaseRealConnector):
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
         credentials = _runtime_credentials(self.exchange)
-        account_index = credentials.get("account_index") or settings.lighter_account_index
-        l1_address = credentials.get("l1_address") or settings.lighter_l1_address
+        base_url = str(getattr(settings, self.api_base_setting))
+        account_index = credentials.get("account_index") or str(getattr(settings, self.account_index_setting))
+        l1_address = credentials.get("l1_address") or str(getattr(settings, self.l1_address_setting))
         if not account_index and not l1_address:
             raise RealConnectorNotConfiguredError(
-                "lighter credentials are not configured (LIGHTER_ACCOUNT_INDEX or LIGHTER_L1_ADDRESS)"
+                f"{self.exchange} credentials are not configured "
+                f"({self.account_index_env} or {self.l1_address_env})"
             )
         if not account_index and l1_address:
-            account_index = await self._resolve_account_index(settings.lighter_api_base, l1_address)
+            account_index = await self._resolve_account_index(base_url, l1_address)
 
         payload = await self._get(
-            base_url=settings.lighter_api_base,
+            base_url=base_url,
             path="/api/v1/account",
             params={"by": "index", "value": str(account_index), "active_only": True},
             headers={"accept": "application/json"},
@@ -2094,6 +2101,15 @@ class LighterRealConnector(_BaseRealConnector):
             positions=positions,
             updated_at=utc_now(),
         )
+
+
+class LighterRHRealConnector(LighterRealConnector):
+    exchange = "lighter-rh"
+    api_base_setting = "lighter_rh_api_base"
+    account_index_setting = "lighter_rh_account_index"
+    l1_address_setting = "lighter_rh_l1_address"
+    account_index_env = "LIGHTER_RH_ACCOUNT_INDEX"
+    l1_address_env = "LIGHTER_RH_L1_ADDRESS"
 
 
 class NadoRealConnector(_BaseRealConnector):
