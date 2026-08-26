@@ -23,6 +23,11 @@ FIELD_LABELS: dict[tuple[str, str], str] = {
     ("lighter-rh", "account_index"): "account index",
     ("nado", "wallet_address"): "wallet address",
     ("nado", "subaccount_name"): "subaccount name (for example default)",
+    ("woofi", "account_id"): "Orderly account ID",
+    ("woofi", "orderly_key"): "Orderly public key",
+    ("woofi", "orderly_secret"): "Orderly secret",
+    ("aster", "api_key"): "API key",
+    ("aster", "api_secret"): "API secret",
 }
 
 

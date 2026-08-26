@@ -143,3 +143,17 @@ class NadoConnector(ExchangeConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         return make_mock_snapshot(self.exchange, price_shift=115)
+
+
+class AsterConnector(ExchangeConnector):
+    exchange = "aster"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=135)
+
+
+class WoofiConnector(ExchangeConnector):
+    exchange = "woofi"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=125)

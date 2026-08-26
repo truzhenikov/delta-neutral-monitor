@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.connectors.base import ExchangeConnector
 from src.connectors.mock_connectors import (
     AdenConnector,
+    AsterConnector,
     BinanceConnector,
     BingxConnector,
     BitgetConnector,
@@ -22,6 +23,7 @@ from src.connectors.mock_connectors import (
     TxflowConnector,
     VariationalConnector,
     VestConnector,
+    WoofiConnector,
 )
 from src.connectors.real_connectors import (
     AdenRealConnector,
@@ -46,9 +48,12 @@ from src.connectors.real_connectors import (
     VestRealConnector,
 )
 from src.services.credential_store import CredentialStore
+from src.connectors.woofi_connector import WoofiRealConnector
+from src.connectors.aster_connector import AsterRealConnector
 
 MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenConnector,
+    "aster": AsterConnector,
     "binance": BinanceConnector,
     "bitget": BitgetConnector,
     "bingx": BingxConnector,
@@ -68,10 +73,12 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "lighter": LighterConnector,
     "lighter-rh": LighterRHConnector,
     "nado": NadoConnector,
+    "woofi": WoofiConnector,
 }
 
 REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenRealConnector,
+    "aster": AsterRealConnector,
     "binance": BinanceRealConnector,
     "bitget": BitgetRealConnector,
     "bingx": BingxRealConnector,
@@ -91,6 +98,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "lighter": LighterRealConnector,
     "lighter-rh": LighterRHRealConnector,
     "nado": NadoRealConnector,
+    "woofi": WoofiRealConnector,
 }
 
 

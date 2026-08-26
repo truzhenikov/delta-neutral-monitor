@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     heartbeat_interval_sec: int = Field(default=3600, alias="HEARTBEAT_INTERVAL_SEC")
 
     enabled_exchanges: str = Field(
-        default="binance,bitget,bingx,phemex,mexc,hyperliquid,txflow,ondo,extended,okx,kucoin,aden,vest,lighter,lighter-rh", alias="ENABLED_EXCHANGES"
+        default="binance,bitget,bingx,phemex,mexc,hyperliquid,txflow,ondo,extended,okx,kucoin,aden,vest,lighter,lighter-rh,woofi,aster", alias="ENABLED_EXCHANGES"
     )
 
     binance_api_base: str = Field(default="https://fapi.binance.com", alias="BINANCE_API_BASE")
@@ -123,6 +123,14 @@ class Settings(BaseSettings):
     nado_archive_api_base: str = Field(default="https://archive.prod.nado.xyz/v1", alias="NADO_ARCHIVE_API_BASE")
     nado_wallet_address: str = Field(default="", alias="NADO_WALLET_ADDRESS")
     nado_subaccount_name: str = Field(default="default", alias="NADO_SUBACCOUNT_NAME")
+
+    woofi_api_base: str = Field(default="https://api.orderly.org", alias="WOOFI_API_BASE")
+    woofi_account_id: str = Field(default="", alias="WOOFI_ACCOUNT_ID")
+    woofi_orderly_key: str = Field(default="", alias="WOOFI_ORDERLY_KEY")
+    woofi_orderly_secret: str = Field(default="", alias="WOOFI_ORDERLY_SECRET")
+    aster_api_base: str = Field(default="https://fapi.asterdex.com", alias="ASTER_API_BASE")
+    aster_api_key: str = Field(default="", alias="ASTER_API_KEY")
+    aster_api_secret: str = Field(default="", alias="ASTER_API_SECRET")
 
     max_margin_ratio: float = Field(default=0.75, alias="MAX_MARGIN_RATIO")
     min_liq_distance_pct: float = Field(default=12.0, alias="MIN_LIQ_DISTANCE_PCT")

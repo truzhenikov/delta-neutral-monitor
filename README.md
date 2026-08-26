@@ -79,6 +79,10 @@ Fill in the exchange credentials you actually use. At minimum, configure:
 
 For Nado, set `NADO_WALLET_ADDRESS` and, if needed, `NADO_SUBACCOUNT_NAME` (defaults to `default`). The connector only uses public Gateway and Archive queries; do not provide a private key.
 
+For WOOFi Pro, set `WOOFI_ACCOUNT_ID`, `WOOFI_ORDERLY_KEY`, and `WOOFI_ORDERLY_SECRET`. WOOFi Pro uses Orderly's read-only authenticated endpoints (`/v1/account_info` and `/v1/positions`) with Ed25519 signatures. The secret is base58-encoded; it is never logged or sent directly.
+
+For Aster, set `ASTER_API_KEY` and `ASTER_API_SECRET`. The connector uses the documented Binance-compatible Futures API in read-only mode (`GET /fapi/v4/account` and `GET /fapi/v2/positionRisk`).
+
 > The sample file intentionally does **not** enable any demo/mock runtime mode.
 
 ### 3) Run the backend
