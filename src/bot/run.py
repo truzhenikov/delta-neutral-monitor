@@ -95,8 +95,10 @@ def render_positions_text(status: dict) -> str:
     for account in status["accounts"]:
         lines.append(f"[{account['exchange']}]")
         for p in account["positions"]:
+            liquidation_price = p["liquidation_price"]
+            liquidation_text = "None" if liquidation_price is None else f"{liquidation_price:.2f}"
             lines.append(
-                f"{p['symbol']} {p['side']} size={p['size']} mark={p['mark_price']} liq={p['liquidation_price']}"
+                f"{p['symbol']} {p['side']} size={p['size']} mark={p['mark_price']} liq={liquidation_text}"
             )
     return "\n".join(lines)
 
