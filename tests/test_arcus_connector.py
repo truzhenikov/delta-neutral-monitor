@@ -36,12 +36,13 @@ def test_arcus_maps_account_and_positions(monkeypatch) -> None:
         "/v1/positions": {
             "positions": {
                 "1": {
-                    "market": "BTC-USD",
-                    "size": "-0.2",
-                    "avgEntryPrice": "50000",
-                    "markPrice": "51000",
-                    "liquidationPrice": "70000",
-                    "leverage": "5",
+                    "marketDisplayName": "INTC-USD",
+                    "side": "SHORT",
+                    "size": "-40",
+                    "averageEntryPrice": "89.49",
+                    "markPx": "89.34",
+                    "leverage": "10",
+                    "marginMode": "CROSS",
                 }
             }
         },
@@ -52,12 +53,12 @@ def test_arcus_maps_account_and_positions(monkeypatch) -> None:
     assert snapshot.exchange == "arcus"
     assert snapshot.equity_usd == 1012.5
     assert snapshot.available_margin_usd == 800.25
-    assert snapshot.positions[0].symbol == "BTC-USD"
+    assert snapshot.positions[0].symbol == "INTC-USD"
     assert snapshot.positions[0].side == "short"
-    assert snapshot.positions[0].size == 0.2
-    assert snapshot.positions[0].entry_price == 50000
-    assert snapshot.positions[0].mark_price == 51000
-    assert snapshot.positions[0].liquidation_price == 70000
+    assert snapshot.positions[0].size == 40
+    assert snapshot.positions[0].entry_price == 89.49
+    assert snapshot.positions[0].mark_price == 89.34
+    assert snapshot.positions[0].liquidation_price is None
     assert connector.calls[0][1:] == ("/v1/account", {"address": "0xabc0000000000000000000000000000000000001", "accountIndex": 2}, None)
     assert connector.calls[1][1:] == ("/v1/positions", {"address": "0xabc0000000000000000000000000000000000001", "accountIndex": 2}, None)
     get_settings.cache_clear()

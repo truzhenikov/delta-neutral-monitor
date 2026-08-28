@@ -69,9 +69,9 @@ class ArcusRealConnector(_BaseRealConnector):
             side_raw = str(self._value(row, "side", "direction", default="")).strip().lower()
             side = "short" if raw_size < 0 or side_raw in {"short", "sell"} else "long"
             size = abs(raw_size)
-            mark = _safe_float(self._value(row, "markPrice", "oraclePrice", "price"))
+            mark = _safe_float(self._value(row, "markPx", "markPrice", "oraclePrice", "price"))
             entry = _safe_float(self._value(row, "avgEntryPrice", "averageEntryPrice", "entryPrice"), default=mark)
-            symbol = str(self._value(row, "market", "marketName", "symbol", default=market_id))
+            symbol = str(self._value(row, "marketDisplayName", "market", "marketName", "symbol", default=market_id))
             positions.append(Position(
                 exchange=self.exchange,
                 symbol=symbol,
