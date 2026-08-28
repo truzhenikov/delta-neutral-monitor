@@ -1,5 +1,6 @@
 import asyncio
 
+import pytest
 from src.config import get_settings
 from src.connectors.arcus_connector import ArcusRealConnector
 from src.connectors.factory import build_connectors
@@ -46,6 +47,9 @@ def test_arcus_maps_account_and_positions(monkeypatch) -> None:
                 }
             }
         },
+        "/v1/markets": {
+            "markets": [{"marketId": 1, "maintenanceMarginFraction": "0.066667"}]
+        },
     })
 
     snapshot = asyncio.run(connector.fetch_account_snapshot())
@@ -58,7 +62,7 @@ def test_arcus_maps_account_and_positions(monkeypatch) -> None:
     assert snapshot.positions[0].size == 40
     assert snapshot.positions[0].entry_price == 89.49
     assert snapshot.positions[0].mark_price == 89.34
-    assert snapshot.positions[0].liquidation_price is None
+    assert snapshot.positions[0].liquidation_price == pytest.approx(107.49, rel=1e-3)
     assert connector.calls[0][1:] == ("/v1/account", {"address": "0xabc0000000000000000000000000000000000001", "accountIndex": 2}, None)
     assert connector.calls[1][1:] == ("/v1/positions", {"address": "0xabc0000000000000000000000000000000000001", "accountIndex": 2}, None)
     get_settings.cache_clear()

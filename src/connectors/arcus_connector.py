@@ -39,6 +39,52 @@ class ArcusRealConnector(_BaseRealConnector):
                 rows.append((str(market_id), row))
         return rows
 
+    @classmethod
+    def _cross_liquidation_prices(
+        cls,
+        equity: float,
+        rows: list[tuple[str, dict[str, Any]]],
+        markets_payload: Any,
+    ) -> dict[str, float]:
+        """Estimate Arcus cross-margin liquidation prices.
+
+        Arcus does not expose a liquidation-price field. Its public account
+        and market endpoints expose the inputs needed for the maintenance
+        margin boundary. Other positions' marks are held fixed.
+        """
+        if not isinstance(markets_payload, dict):
+            return {}
+        markets = {
+            str(item.get("marketId")): item
+            for item in markets_payload.get("markets", [])
+            if isinstance(item, dict) and item.get("marketId") is not None
+        }
+        parsed: list[tuple[str, float, float, float, float]] = []
+        for market_id, row in rows:
+            raw_size = _safe_float(cls._value(row, "size", "positionSize", "quantity", "qty"))
+            size = abs(raw_size)
+            mark = _safe_float(cls._value(row, "markPx", "markPrice", "oraclePrice", "price"))
+            if size <= 0 or mark <= 0:
+                continue
+            side = str(cls._value(row, "side", "direction", default="")).strip().lower()
+            signed_size = -size if raw_size < 0 or side in {"short", "sell"} else size
+            market = markets.get(str(market_id), {})
+            mmf = _safe_float(cls._value(row, "maintenanceMarginFraction"), default=_safe_float(market.get("maintenanceMarginFraction")))
+            if mmf <= 0:
+                continue
+            parsed.append((market_id, signed_size, mark, mmf, abs(signed_size) * mark * mmf))
+
+        result: dict[str, float] = {}
+        for market_id, signed_size, mark, mmf, _ in parsed:
+            other_maintenance = sum(item[4] for item in parsed if item[0] != market_id)
+            denominator = signed_size - abs(signed_size) * mmf
+            if denominator == 0:
+                continue
+            price = (other_maintenance - equity + signed_size * mark) / denominator
+            if price > 0:
+                result[market_id] = price
+        return result
+
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
         credentials = _runtime_credentials(self.exchange)
@@ -56,13 +102,18 @@ class ArcusRealConnector(_BaseRealConnector):
         params = {"address": address, "accountIndex": index}
         account = await self._get(settings.arcus_api_base, "/v1/account", params=params)
         positions_payload = await self._get(settings.arcus_api_base, "/v1/positions", params=params)
+        markets_payload = await self._get(settings.arcus_api_base, "/v1/markets")
         if not isinstance(account, dict):
             raise RealConnectorRequestError(f"arcus account error: {account}")
         if "error" in account:
             raise RealConnectorRequestError(f"arcus account error: {account}")
 
+        position_rows = self._position_rows(positions_payload)
+        liquidation_prices = self._cross_liquidation_prices(
+            _safe_float(account.get("equity")), position_rows, markets_payload
+        )
         positions: list[Position] = []
-        for market_id, row in self._position_rows(positions_payload):
+        for market_id, row in position_rows:
             raw_size = _safe_float(self._value(row, "size", "positionSize", "quantity", "qty"))
             if raw_size == 0:
                 continue
@@ -80,7 +131,15 @@ class ArcusRealConnector(_BaseRealConnector):
                 entry_price=entry,
                 mark_price=mark,
                 leverage=_safe_float(self._value(row, "leverage"), default=1.0),
-                liquidation_price=_safe_liq_price(self._value(row, "liquidationPrice", "liquidation_price", "estLiqPrice")),
+                liquidation_price=_safe_liq_price(
+                    self._value(
+                        row,
+                        "liquidationPrice",
+                        "liquidation_price",
+                        "estLiqPrice",
+                        default=liquidation_prices.get(market_id),
+                    )
+                ),
             ))
 
         return AccountSnapshot(
