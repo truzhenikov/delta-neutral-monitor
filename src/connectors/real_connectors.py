@@ -1509,7 +1509,9 @@ class VariationalRealConnector(_BaseRealConnector):
         margin_usage = portfolio.get("margin_usage") or {}
         positions_payload = raw_positions if isinstance(raw_positions, list) else []
 
-        equity = _safe_float(portfolio.get("balance")) + _safe_float(portfolio.get("upnl"))
+        # Variational's portfolio.balance already represents account equity;
+        # upnl is informational and must not be added a second time.
+        equity = _safe_float(portfolio.get("balance"))
         initial_margin = _safe_float(margin_usage.get("initial_margin"))
         maintenance_margin = _safe_float(margin_usage.get("maintenance_margin"))
         available_margin = max(0.0, equity - initial_margin)

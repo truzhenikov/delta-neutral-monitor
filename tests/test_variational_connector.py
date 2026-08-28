@@ -131,8 +131,10 @@ def test_variational_real_connector_maps_account_snapshot(monkeypatch) -> None:
 
     assert [path for path, _, _ in connector.calls] == ["/api/portfolio", "/api/positions"]
     assert snapshot.exchange == "variational"
-    assert snapshot.equity_usd == 1300.0
-    assert snapshot.available_margin_usd == 888.4
+    # Variational portfolio.balance already includes current portfolio value;
+    # upnl must not be added again or equity will be understated/overstated.
+    assert snapshot.equity_usd == 1281.4982369992
+    assert abs(snapshot.available_margin_usd - 869.8982369992) < 1e-9
     assert snapshot.maintenance_margin_usd == 123.45
     assert len(snapshot.positions) == 2
 
@@ -142,7 +144,7 @@ def test_variational_real_connector_maps_account_snapshot(monkeypatch) -> None:
     assert first.size == 0.125
     assert first.entry_price == 117250.0
     assert first.mark_price == 118500.25
-    assert first.leverage == 11.394253846153847
+    assert first.leverage == 11.558759561531296
     assert first.liquidation_price == 102000.0
 
     second = snapshot.positions[1]
@@ -151,7 +153,7 @@ def test_variational_real_connector_maps_account_snapshot(monkeypatch) -> None:
     assert second.size == 3.5
     assert second.entry_price == 3550.4
     assert second.mark_price == 3625.8
-    assert second.leverage == 9.76176923076923
+    assert second.leverage == 9.90270578109888
     assert second.liquidation_price == 4120.2
 
     get_settings.cache_clear()
