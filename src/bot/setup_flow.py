@@ -26,8 +26,9 @@ FIELD_LABELS: dict[tuple[str, str], str] = {
     ("woofi", "account_id"): "Orderly account ID",
     ("woofi", "orderly_key"): "Orderly public key",
     ("woofi", "orderly_secret"): "Orderly secret",
-    ("aster", "api_key"): "API key",
-    ("aster", "api_secret"): "API secret",
+    ("aster", "user_address"): "master wallet address (user)",
+    ("aster", "signer"): "API Wallet / Agent address (signer)",
+    ("aster", "signer_private_key"): "API Wallet / Agent private key",
     ("arcus", "address"): "master Ethereum address",
     ("arcus", "account_index"): "account index (0-9)",
 }

@@ -28,7 +28,7 @@ class CredentialStore:
         "variational": ("vr_token",),
         "extended": ("api_key", "stark_key_public", "stark_key_private", "vault_number", "client_id"),
         "woofi": ("account_id", "orderly_key", "orderly_secret"),
-        "aster": ("api_key", "api_secret"),
+        "aster": ("user_address", "signer", "signer_private_key"),
         "arcus": ("address", "account_index"),
     }
     PROFILE_SEPARATOR = ":"
