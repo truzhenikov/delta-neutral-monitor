@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     heartbeat_interval_sec: int = Field(default=3600, alias="HEARTBEAT_INTERVAL_SEC")
 
     enabled_exchanges: str = Field(
-        default="binance,bitget,bingx,phemex,mexc,hyperliquid,txflow,ondo,extended,okx,kucoin,aden,vest,lighter,lighter-rh,woofi,aster", alias="ENABLED_EXCHANGES"
+        default="binance,bitget,bingx,phemex,mexc,hyperliquid,txflow,ondo,extended,okx,kucoin,aden,vest,lighter,lighter-rh,woofi,aster,arcus", alias="ENABLED_EXCHANGES"
     )
 
     binance_api_base: str = Field(default="https://fapi.binance.com", alias="BINANCE_API_BASE")
@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     aster_api_base: str = Field(default="https://fapi.asterdex.com", alias="ASTER_API_BASE")
     aster_api_key: str = Field(default="", alias="ASTER_API_KEY")
     aster_api_secret: str = Field(default="", alias="ASTER_API_SECRET")
+    arcus_api_base: str = Field(default="https://api.arcus.xyz", alias="ARCUS_API_BASE")
+    arcus_address: str = Field(default="", alias="ARCUS_ADDRESS")
+    arcus_account_index: int = Field(default=0, alias="ARCUS_ACCOUNT_INDEX")
 
     max_margin_ratio: float = Field(default=0.75, alias="MAX_MARGIN_RATIO")
     min_liq_distance_pct: float = Field(default=12.0, alias="MIN_LIQ_DISTANCE_PCT")

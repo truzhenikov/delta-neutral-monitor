@@ -157,3 +157,10 @@ class WoofiConnector(ExchangeConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         return make_mock_snapshot(self.exchange, price_shift=125)
+
+
+class ArcusConnector(ExchangeConnector):
+    exchange = "arcus"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=130)

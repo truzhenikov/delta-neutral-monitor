@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.connectors.base import ExchangeConnector
 from src.connectors.mock_connectors import (
     AdenConnector,
+    ArcusConnector,
     AsterConnector,
     BinanceConnector,
     BingxConnector,
@@ -50,6 +51,7 @@ from src.connectors.real_connectors import (
 from src.services.credential_store import CredentialStore
 from src.connectors.woofi_connector import WoofiRealConnector
 from src.connectors.aster_connector import AsterRealConnector
+from src.connectors.arcus_connector import ArcusRealConnector
 
 MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenConnector,
@@ -74,6 +76,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "lighter-rh": LighterRHConnector,
     "nado": NadoConnector,
     "woofi": WoofiConnector,
+    "arcus": ArcusConnector,
 }
 
 REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
@@ -99,6 +102,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "lighter-rh": LighterRHRealConnector,
     "nado": NadoRealConnector,
     "woofi": WoofiRealConnector,
+    "arcus": ArcusRealConnector,
 }
 
 

@@ -28,6 +28,8 @@ FIELD_LABELS: dict[tuple[str, str], str] = {
     ("woofi", "orderly_secret"): "Orderly secret",
     ("aster", "api_key"): "API key",
     ("aster", "api_secret"): "API secret",
+    ("arcus", "address"): "master Ethereum address",
+    ("arcus", "account_index"): "account index (0-9)",
 }
 
 
