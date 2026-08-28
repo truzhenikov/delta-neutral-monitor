@@ -12,11 +12,36 @@ from src.connectors.real_connectors import (
     RealConnectorNotConfiguredError,
     RealConnectorRequestError,
     _nado_subaccount_hex,
+    _nado_estimated_liquidation_price,
 )
 from src.services.credential_store import CredentialStore
 
 
 X18 = 10**18
+
+
+def test_nado_estimated_liquidation_price_matches_nado_ui_formula() -> None:
+    assert _nado_estimated_liquidation_price(
+        amount=2.0,
+        oracle_price=100.0,
+        maintenance_health=10.0,
+        long_weight_maintenance=0.95,
+        short_weight_maintenance=1.05,
+    ) == pytest.approx(94.7368421053)
+    assert _nado_estimated_liquidation_price(
+        amount=-2.0,
+        oracle_price=100.0,
+        maintenance_health=10.0,
+        long_weight_maintenance=0.95,
+        short_weight_maintenance=1.05,
+    ) == pytest.approx(104.7619047619)
+    assert _nado_estimated_liquidation_price(
+        amount=0.0,
+        oracle_price=100.0,
+        maintenance_health=10.0,
+        long_weight_maintenance=0.95,
+        short_weight_maintenance=1.05,
+    ) is None
 
 
 class StubNadoConnector(NadoRealConnector):
@@ -145,9 +170,9 @@ def test_nado_real_connector_maps_cross_and_isolated_account(monkeypatch, tmp_pa
         },
     }
     connector.symbols_payload = [
-        {"type": "perp", "product_id": 2, "symbol": "BTC-PERP"},
-        {"type": "perp", "product_id": 4, "symbol": "ETH-PERP"},
-        {"type": "perp", "product_id": 6, "symbol": "SOL-PERP"},
+        {"type": "perp", "product_id": 2, "symbol": "BTC-PERP", "long_weight_maintenance_x18": str(0.95 * X18)},
+        {"type": "perp", "product_id": 4, "symbol": "ETH-PERP", "long_weight_maintenance_x18": str(0.95 * X18)},
+        {"type": "perp", "product_id": 6, "symbol": "SOL-PERP", "long_weight_maintenance_x18": str(0.95 * X18)},
     ]
     connector.prices_payload = {
         "2": {"product_id": 2, "mark_price_x18": str(110_000 * X18), "update_time": "1"},
@@ -172,7 +197,11 @@ def test_nado_real_connector_maps_cross_and_isolated_account(monkeypatch, tmp_pa
         (150.0, 160.0),
     ]
     assert all(p.leverage == 1.0 for p in snapshot.positions)
-    assert all(p.liquidation_price is None for p in snapshot.positions)
+    assert [p.liquidation_price for p in snapshot.positions] == pytest.approx([
+        110_000.0 - 850.0 / 0.5 / 0.95,
+        3800.0 + 850.0 / 2.0 / 1.05,
+        160.0 - 150.0 / 10.0 / 0.95,
+    ])
 
     subaccount = _nado_subaccount_hex(
         "0x7a5ec2748e9065794491a8d29dcf3f9edb8d7c43",

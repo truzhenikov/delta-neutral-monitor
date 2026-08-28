@@ -2112,6 +2112,27 @@ class LighterRHRealConnector(LighterRealConnector):
     l1_address_env = "LIGHTER_RH_L1_ADDRESS"
 
 
+def _nado_estimated_liquidation_price(
+    amount: float,
+    oracle_price: float,
+    maintenance_health: float,
+    long_weight_maintenance: float,
+    short_weight_maintenance: float,
+) -> float | None:
+    """Mirror Nado web's estimated liquidation-price calculation."""
+    if amount == 0 or oracle_price <= 0 or maintenance_health < 0:
+        return None
+    if amount > 0:
+        if long_weight_maintenance <= 0:
+            return None
+        price = oracle_price - maintenance_health / amount / long_weight_maintenance
+        return price if price > 0 else None
+    if short_weight_maintenance <= 0:
+        return None
+    price = oracle_price + maintenance_health / abs(amount) / short_weight_maintenance
+    return price if price < oracle_price * 10 else None
+
+
 class NadoRealConnector(_BaseRealConnector):
     exchange = "nado"
     _X18 = 10**18
@@ -2155,6 +2176,37 @@ class NadoRealConnector(_BaseRealConnector):
             symbol = str(row.get("symbol") or "").strip()
             if product_id >= 0 and symbol:
                 result[product_id] = symbol
+        return result
+
+    def _risk_weights(self, payload: Any) -> dict[int, tuple[float, float]]:
+        rows = payload.get("data", payload.get("symbols", [])) if isinstance(payload, dict) else payload
+        if isinstance(rows, dict):
+            rows = rows.get("symbols", [])
+        result: dict[int, tuple[float, float]] = {}
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict) or str(row.get("type", "")).lower() != "perp":
+                continue
+            product_id = int(_safe_float(row.get("product_id"), default=-1))
+            long_weight = float(_nado_decimal(row.get("long_weight_maintenance_x18")) / Decimal(self._X18))
+            short_raw = row.get("short_weight_maintenance_x18")
+            short_weight = (
+                float(_nado_decimal(short_raw) / Decimal(self._X18))
+                if short_raw is not None else 2.0 - long_weight
+            )
+            if product_id >= 0 and long_weight > 0 and short_weight > 0:
+                result[product_id] = (long_weight, short_weight)
+        return result
+
+    def _oracle_prices(self, payload: Any) -> dict[int, float]:
+        data = payload.get("data", {}) if isinstance(payload, dict) and payload.get("status") is not None else payload
+        result: dict[int, float] = {}
+        for key, row in data.items() if isinstance(data, dict) else []:
+            if not isinstance(row, dict):
+                continue
+            product_id = int(_safe_float(row.get("product_id", key), default=-1))
+            oracle = float(_nado_decimal(row.get("oracle_price_x18")) / Decimal(self._X18))
+            if product_id >= 0 and oracle > 0:
+                result[product_id] = oracle
         return result
 
     def _mark_prices(self, payload: Any) -> dict[int, float]:
@@ -2214,14 +2266,19 @@ class NadoRealConnector(_BaseRealConnector):
         balance_rows: list[dict[str, Any]] = [
             row for row in (account.get("perp_balances") or []) if isinstance(row, dict)
         ]
+        isolated_health_by_product: dict[int, Any] = {}
         health_groups: list[Any] = [account.get("healths")]
         for isolated in isolated_data.get("isolated_positions") or []:
             if not isinstance(isolated, dict):
                 continue
-            health_groups.append(isolated.get("healths"))
+            isolated_healths = isolated.get("healths")
+            health_groups.append(isolated_healths)
             base_balance = isolated.get("base_balance")
             if isinstance(base_balance, dict):
                 balance_rows.append(base_balance)
+                isolated_product_id = int(_safe_float(base_balance.get("product_id"), default=-1))
+                if isolated_product_id >= 0:
+                    isolated_health_by_product[isolated_product_id] = isolated_healths
 
         active_rows: list[tuple[int, float, float]] = []
         for row in balance_rows:
@@ -2244,9 +2301,11 @@ class NadoRealConnector(_BaseRealConnector):
             headers=headers,
         )
         symbols = self._symbol_map(symbols_payload)
+        risk_weights = self._risk_weights(symbols_payload)
 
         product_ids = sorted({product_id for product_id, _, _ in active_rows})
         marks: dict[int, float] = {}
+        oracles: dict[int, float] = {}
         if product_ids:
             prices_payload = await self._post(
                 base_url=settings.nado_archive_api_base,
@@ -2259,6 +2318,13 @@ class NadoRealConnector(_BaseRealConnector):
                 },
             )
             marks = self._mark_prices(prices_payload)
+            oracles = self._oracle_prices(prices_payload)
+
+        cross_healths = account.get("healths") or []
+        cross_maintenance_health = (
+            float(_nado_decimal((cross_healths[1] or {}).get("health")) / Decimal(self._X18))
+            if len(cross_healths) > 1 else 0.0
+        )
 
         positions = [
             Position(
@@ -2269,7 +2335,23 @@ class NadoRealConnector(_BaseRealConnector):
                 entry_price=entry_price,
                 mark_price=marks.get(product_id, entry_price),
                 leverage=1.0,
-                liquidation_price=None,
+                liquidation_price=(
+                    _nado_estimated_liquidation_price(
+                        amount=amount,
+                        oracle_price=oracles.get(product_id, marks.get(product_id, entry_price)),
+                        maintenance_health=(
+                            float(_nado_decimal((isolated_health_by_product[product_id][1] or {}).get("health")) / Decimal(self._X18))
+                            if product_id in isolated_health_by_product
+                            and isinstance(isolated_health_by_product[product_id], list)
+                            and len(isolated_health_by_product[product_id]) > 1
+                            else cross_maintenance_health
+                        ),
+                        long_weight_maintenance=risk_weights[product_id][0],
+                        short_weight_maintenance=risk_weights[product_id][1],
+                    )
+                    if product_id in risk_weights
+                    else None
+                ),
             )
             for product_id, amount, entry_price in active_rows
         ]
