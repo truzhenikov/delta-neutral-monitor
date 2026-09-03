@@ -116,9 +116,11 @@ def test_profiled_exchange_credentials_round_trip(tmp_path: Path) -> None:
 
     assert store.get_exchange_credentials("hyperliquid:main") == {
         "user_address": "0xabc",
+        "dex": "xyz,cash",
     }
     assert store.get_exchange_credentials("hyperliquid:alt") == {
         "user_address": "0xdef",
+        "dex": "cash",
     }
     assert store.list_enabled_exchanges() == ["hyperliquid:alt", "hyperliquid:main"]
 
@@ -138,4 +140,14 @@ def test_list_exchange_statuses_includes_profiled_entries(tmp_path: Path) -> Non
     assert statuses["hyperliquid:main"]["configured"] is True
     assert statuses["hyperliquid:main"]["base_exchange"] == "hyperliquid"
     assert statuses["hyperliquid:main"]["profile_name"] == "main"
-    assert statuses["hyperliquid:main"]["credentials"] == {"user_address": "*****"}
+    assert statuses["hyperliquid:main"]["credentials"] == {"user_address": "*****", "dex": "xyz,cash"}
+
+
+def test_credential_store_file_is_owner_only(tmp_path: Path) -> None:
+    from src.services.credential_store import CredentialStore
+
+    storage_path = tmp_path / "exchanges.json"
+    store = CredentialStore(storage_path)
+    store.set_exchange_credentials("aden", {"api_key": "akey1234", "api_secret": "secret456"})
+
+    assert storage_path.stat().st_mode & 0o777 == 0o600

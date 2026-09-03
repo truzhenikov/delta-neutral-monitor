@@ -31,6 +31,11 @@ class CredentialStore:
         "aster": ("user_address", "signer", "signer_private_key"),
         "arcus": ("address", "account_index"),
     }
+    OPTIONAL_EXCHANGE_FIELDS: dict[str, tuple[str, ...]] = {
+        # Hyperliquid DEX namespaces (for example xyz, cash, km, flx, io)
+        # are optional because the public/default perp namespace needs none.
+        "hyperliquid": ("dex",),
+    }
     PROFILE_SEPARATOR = ":"
 
     def __init__(self, storage_path: Path) -> None:
@@ -83,6 +88,7 @@ class CredentialStore:
         normalized_exchange = self.normalize_exchange_ref(exchange)
         base_exchange = self.get_base_exchange(normalized_exchange)
         allowed_fields = set(self.SUPPORTED_EXCHANGES[base_exchange])
+        allowed_fields.update(self.OPTIONAL_EXCHANGE_FIELDS.get(base_exchange, ()))
         filtered_payload = {key: value for key, value in payload.items() if key in allowed_fields and value}
         state = self._read_state()
         current = state["exchanges"].get(
@@ -251,6 +257,7 @@ class CredentialStore:
                 normalized_base_exchange = base_exchange
             normalized_profile_name = raw_profile_name if raw_profile_name is None else str(raw_profile_name).strip().lower()
             allowed_fields = set(self.SUPPORTED_EXCHANGES[normalized_base_exchange])
+            allowed_fields.update(self.OPTIONAL_EXCHANGE_FIELDS.get(normalized_base_exchange, ()))
             credentials = {
                 key: str(value)
                 for key, value in raw_credentials.items()

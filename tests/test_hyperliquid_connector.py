@@ -338,3 +338,33 @@ def test_hyperliquid_real_connector_falls_back_when_maintenance_missing(monkeypa
     assert snapshot.available_margin_usd == pytest.approx(799.0)
 
     get_settings.cache_clear()
+
+
+def test_hyperliquid_io_dex_namespace_is_sent_to_info_requests(monkeypatch) -> None:
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("HYPERLIQUID_USER_ADDRESS", "0xuser")
+    monkeypatch.setenv("HYPERLIQUID_DEX", "io")
+
+    connector = StubHyperliquidConnector()
+    connector._responses = [
+        {"marginSummary": {"accountValue": "100"}, "assetPositions": []},
+        [{"universe": []}, []],
+        {"balances": [], "tokenToAvailableAfterMaintenance": []},
+        {"universe": [], "tokens": []},
+        {},
+    ]
+    captured_bodies: list[dict] = []
+    original_post = connector._post
+
+    async def capture_post(base_url: str, path: str, body: dict, headers=None) -> object:
+        captured_bodies.append(body)
+        return await original_post(base_url, path, body, headers)
+
+    connector._post = capture_post
+    asyncio.run(connector.fetch_account_snapshot())
+
+    assert captured_bodies[0] == {"type": "clearinghouseState", "user": "0xuser", "dex": "io"}
+    assert captured_bodies[1] == {"type": "metaAndAssetCtxs", "dex": "io"}
+    get_settings.cache_clear()

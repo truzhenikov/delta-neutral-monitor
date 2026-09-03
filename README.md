@@ -48,6 +48,8 @@ The monitor currently supports **23 exchange integrations** for futures/perpetua
 
 Exchange names used in `ENABLED_EXCHANGES` and the Telegram setup flow are the lowercase identifiers: `binance`, `bitget`, `bingx`, `phemex`, `mexc`, `gate`, `pacifica`, `okx`, `kucoin`, `aden`, `vest`, `lighter`, `lighter-rh`, `nado`, `hyperliquid`, `txflow`, `ondo`, `risex`, `variational`, `extended`, `woofi`, `aster`, `arcus`.
 
+Hyperliquid DEX namespaces are configured separately with `HYPERLIQUID_DEX`. The IO provider is supported as `io`; multiple namespaces can be listed comma-separated, for example `xyz,cash,km,flx,io`. The same `dex` value can be stored in a profiled Hyperliquid credential entry.
+
 ## No demo mode
 
 This project no longer ships a bundled web demo fallback.
