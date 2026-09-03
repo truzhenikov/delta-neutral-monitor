@@ -20,16 +20,33 @@ For every configured venue it normalizes account state into a common shape and c
 
 ### Supported integrations
 
-Current runtime integrations in this repo target futures accounts for:
+The monitor currently supports **23 exchange integrations** for futures/perpetual account monitoring:
 
+- Binance Futures
 - Bitget
 - BingX
-- Hyperliquid
-- Extended
+- Phemex
+- MEXC
+- Gate.io
+- Pacifica
 - OKX
 - KuCoin Futures
 - ADEN
+- VEST
+- Lighter
+- Lighter Robinhood (Lighter RH)
 - Nado (public read-only account queries; no private key required)
+- Hyperliquid
+- TxFlow
+- Ondo
+- RiseX
+- Variational
+- Extended
+- WOOFi Pro (Orderly)
+- Aster
+- Arcus
+
+Exchange names used in `ENABLED_EXCHANGES` and the Telegram setup flow are the lowercase identifiers: `binance`, `bitget`, `bingx`, `phemex`, `mexc`, `gate`, `pacifica`, `okx`, `kucoin`, `aden`, `vest`, `lighter`, `lighter-rh`, `nado`, `hyperliquid`, `txflow`, `ondo`, `risex`, `variational`, `extended`, `woofi`, `aster`, `arcus`.
 
 ## No demo mode
 
