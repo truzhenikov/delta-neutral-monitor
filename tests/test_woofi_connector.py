@@ -35,7 +35,7 @@ def test_woofi_is_supported_by_factories_and_credentials() -> None:
     assert CredentialStore.SUPPORTED_EXCHANGES["woofi"] == ("account_id", "orderly_key", "orderly_secret")
 
 
-def test_woofi_auth_and_snapshot_mapping(monkeypatch) -> None:
+def test_woofi_auth_and_snapshot_mapping(monkeypatch, tmp_path) -> None:
     private = Ed25519PrivateKey.generate()
     secret = _base58_encode(private.private_bytes_raw())
     public = base64.b64encode(private.public_key().public_bytes_raw()).decode()
@@ -44,6 +44,7 @@ def test_woofi_auth_and_snapshot_mapping(monkeypatch) -> None:
     monkeypatch.setenv("WOOFI_ORDERLY_KEY", public)
     monkeypatch.setenv("WOOFI_ORDERLY_SECRET", secret)
     monkeypatch.setenv("WOOFI_API_BASE", "https://api.orderly.org")
+    monkeypatch.setenv("CREDENTIAL_STORE_PATH", str(tmp_path / "empty-credentials.json"))
 
     connector = StubWoofiConnector({
         "/v1/account_info": {"success": True, "data": {"account_value": 1000, "free_collateral": 800, "maintenance_margin_ratio": 0.05}},

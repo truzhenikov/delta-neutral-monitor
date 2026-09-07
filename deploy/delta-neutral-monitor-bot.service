@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/root/delta-neutral-monitor
 Environment=APP_ENV=prod
-Environment=ENABLED_EXCHANGES=bitget,bingx,hyperliquid,extended,okx,kucoin,aden
+Environment=ENABLED_EXCHANGES=bitget,bingx,hyperliquid,extended,okx,kucoin,aden,woofi
 Environment=REQUEST_TIMEOUT_SEC=20
 Environment=STATUS_CACHE_TTL_SEC=15
 ExecStartPre=/bin/bash /root/delta-neutral-monitor/scripts/configure_kucoin_public_routes.sh
