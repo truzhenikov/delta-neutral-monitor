@@ -113,7 +113,23 @@ class AsterRealConnector(_BaseRealConnector):
             leverage = _safe_float(row.get("leverage"), default=1.0)
             positions.append(Position(exchange=self.exchange, symbol=str(row.get("symbol") or "UNKNOWN"), side=side, size=abs(amount), entry_price=entry, mark_price=mark, leverage=leverage if leverage > 0 else 1.0, liquidation_price=_safe_liq_price(row.get("liquidationPrice"))))
 
-        equity = _safe_float(account.get("totalMarginBalance", account.get("totalWalletBalance")))
-        available = _safe_float(account.get("availableBalance"))
+        # Aster can keep collateral in multiple margin currencies (for example
+        # USDT and USDC). The top-level totalMarginBalance/availableBalance
+        # fields may represent only the primary settlement asset, so prefer the
+        # per-asset margin balances when they are present.
+        margin_assets = []
+        for asset in account.get("assets") or []:
+            if not isinstance(asset, dict):
+                continue
+            margin_balance = _safe_float(asset.get("marginBalance"))
+            if margin_balance != 0:
+                margin_assets.append(asset)
+
+        if margin_assets:
+            equity = sum(_safe_float(asset.get("marginBalance")) for asset in margin_assets)
+            available = sum(_safe_float(asset.get("availableBalance")) for asset in margin_assets)
+        else:
+            equity = _safe_float(account.get("totalMarginBalance", account.get("totalWalletBalance")))
+            available = _safe_float(account.get("availableBalance"))
         maintenance = _safe_float(account.get("totalMaintMargin"))
         return AccountSnapshot(exchange=self.exchange, equity_usd=equity, available_margin_usd=available, maintenance_margin_usd=maintenance, positions=positions, updated_at=utc_now())

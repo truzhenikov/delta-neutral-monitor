@@ -55,12 +55,21 @@ async def test_snapshot_uses_v3_read_only_endpoints(monkeypatch: pytest.MonkeyPa
     async def fake_get(_self, _base: str, path: str, **kwargs):
         calls.append(path)
         if path == "/fapi/v3/account":
-            return {"totalMarginBalance": "100", "availableBalance": "90", "totalMaintMargin": "1"}
+            return {
+                "totalMarginBalance": "100",
+                "availableBalance": "90",
+                "totalMaintMargin": "1",
+                "assets": [
+                    {"asset": "USDT", "marginBalance": "100", "availableBalance": "90"},
+                    {"asset": "USDC", "marginBalance": "25", "availableBalance": "20"},
+                ],
+            }
         return [{"symbol": "BTCUSDT", "positionAmt": "2", "entryPrice": "10", "markPrice": "11", "leverage": "5", "liquidationPrice": "2"}]
 
     monkeypatch.setattr(AsterRealConnector, "_get", fake_get)
     snapshot = await AsterRealConnector().fetch_account_snapshot()
     assert calls == ["/fapi/v3/account", "/fapi/v3/positionRisk"]
-    assert snapshot.equity_usd == 100
+    assert snapshot.equity_usd == 125
+    assert snapshot.available_margin_usd == 110
     assert len(snapshot.positions) == 1
     assert snapshot.positions[0].side == "long"
