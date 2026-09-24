@@ -51,7 +51,8 @@ logger = logging.getLogger(__name__)
 async def collect_status_snapshot() -> dict:
     settings = get_settings()
     api_base = f"http://127.0.0.1:{settings.api_port}"
-    async with httpx.AsyncClient(timeout=settings.request_timeout_sec) as client:
+    timeout = getattr(settings, "bot_status_timeout_sec", settings.request_timeout_sec)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{api_base}/v1/status", headers={"Accept": "application/json"})
         response.raise_for_status()
         return response.json()

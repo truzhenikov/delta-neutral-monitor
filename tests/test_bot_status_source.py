@@ -118,6 +118,38 @@ async def test_collect_status_snapshot_fetches_backend_status_endpoint(monkeypat
     assert snapshot["source"] == "live"
 
 
+@pytest.mark.asyncio
+async def test_collect_status_snapshot_uses_dedicated_backend_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.bot import run
+
+    status = build_status()
+    seen_timeouts: list[float] = []
+
+    monkeypatch.setattr(
+        run,
+        "get_settings",
+        lambda: type(
+            "Settings",
+            (),
+            {"api_port": 8080, "request_timeout_sec": 10.0, "bot_status_timeout_sec": 45.0},
+        )(),
+    )
+
+    def build_client(timeout: float) -> _FakeAsyncClient:
+        seen_timeouts.append(timeout)
+        return _FakeAsyncClient(
+            expected_url="http://127.0.0.1:8080/v1/status",
+            payload=status.model_dump(mode="json"),
+            seen_urls=[],
+        )
+
+    monkeypatch.setattr(run.httpx, "AsyncClient", build_client)
+
+    await run.collect_status_snapshot()
+
+    assert seen_timeouts == [45.0]
+
+
 def test_alert_loop_uses_shared_backend_snapshot_instead_of_local_monitoring(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
