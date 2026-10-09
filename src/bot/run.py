@@ -91,15 +91,28 @@ def render_risk_text(status: dict) -> str:
     return "\n".join(lines)
 
 
+def format_position_price(value: float) -> str:
+    if value > 1:
+        return f"{value:.2f}"
+    return f"{value:.8f}".rstrip("0").rstrip(".")
+
+
+def format_position_size(value: float) -> str:
+    precision = 4 if abs(value) >= 1 else 8
+    return f"{value:.{precision}f}".rstrip("0").rstrip(".")
+
+
 def render_positions_text(status: dict) -> str:
     lines = ["Open positions:"]
     for account in status["accounts"]:
         lines.append(f"[{account['exchange']}]")
         for p in account["positions"]:
             liquidation_price = p["liquidation_price"]
-            liquidation_text = "None" if liquidation_price is None else f"{liquidation_price:.2f}"
+            liquidation_text = "None" if liquidation_price is None else format_position_price(liquidation_price)
+            mark_text = format_position_price(p["mark_price"])
+            size_text = format_position_size(p["size"])
             lines.append(
-                f"{p['symbol']} {p['side']} size={p['size']} mark={p['mark_price']} liq={liquidation_text}"
+                f"{p['symbol']} {p['side']} size={size_text} mark={mark_text} liq={liquidation_text}"
             )
     return "\n".join(lines)
 

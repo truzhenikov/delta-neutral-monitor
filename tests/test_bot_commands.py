@@ -122,6 +122,42 @@ def test_build_daily_snapshots_reply_renders_rows() -> None:
     assert "warnings:" not in text
 
 
+def test_render_positions_rounds_prices_above_one_to_two_decimals() -> None:
+    from src.bot.run import render_positions_text
+
+    status = {
+        "accounts": [
+            {
+                "exchange": "aster:test",
+                "positions": [
+                    {
+                        "symbol": "METAUSD1",
+                        "side": "long",
+                        "size": 16.0005004,
+                        "mark_price": 720.60394732,
+                        "liquidation_price": 574.954321,
+                    },
+                    {
+                        "symbol": "AUDUSD",
+                        "side": "long",
+                        "size": 50_000.0,
+                        "mark_price": 0.69795,
+                        "liquidation_price": 0.67,
+                    },
+                ],
+            }
+        ]
+    }
+
+    text = render_positions_text(status)
+
+    assert "mark=720.60 liq=574.95" in text
+    assert "mark=0.69795 liq=0.67" in text
+    assert "size=16.0005" in text
+    assert "16.0005004" not in text
+    assert "720.60394732" not in text
+
+
 def test_toggle_alerts_updates_preferences_and_returns_settings_text(tmp_path) -> None:
     from src.bot.command_logic import toggle_alerts
 
