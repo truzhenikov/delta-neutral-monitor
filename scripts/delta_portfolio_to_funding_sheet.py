@@ -37,7 +37,7 @@ EXCHANGE_TO_HEADER = {
     "extended:extended-44c3": "Extended",
     "hyperliquid:hl-3c3b": "HL",
     "hyperliquid:hl-e48b": "HL-48b",
-    "kucoin:kucoin-1": "Kucoin",
+    "variational:var-3c3b": "Var-3c3b",
     "gate": "Gate",
     "lighter:lighter-3c3b": "Lighter",
     "lighter-rh:robinhood": "Lighter-RH-3c3b",
