@@ -74,6 +74,7 @@ def get_funding_report_service() -> FundingReportService:
         variational_api_base=settings.variational_api_base,
         bingx_api_base=settings.bingx_api_base,
         okx_api_base=settings.okx_api_base,
+        ondo_api_base=settings.ondo_api_base,
         request_timeout_sec=settings.request_timeout_sec,
     )
 
