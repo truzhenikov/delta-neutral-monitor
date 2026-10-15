@@ -14,6 +14,7 @@ import httpx
 
 from src.services.bingx_funding import fetch_bingx_funding
 from src.services.credential_store import CredentialStore
+from src.services.okx_funding import fetch_okx_funding
 from src.services.variational_funding import fetch_variational_funding
 
 MSK = ZoneInfo("Europe/Moscow")
@@ -51,6 +52,7 @@ class FundingReportService:
         lighter_api_base: str = "https://mainnet.zklighter.elliot.ai",
         variational_api_base: str = "https://omni.variational.io",
         bingx_api_base: str = "https://open-api.bingx.com",
+        okx_api_base: str = "https://www.okx.com",
         request_timeout_sec: float = 20.0,
         max_lighter_sample_gap_sec: int = 900,
         request_json: _RequestJson | None = None,
@@ -61,6 +63,7 @@ class FundingReportService:
         self.lighter_api_base = lighter_api_base.rstrip("/")
         self.variational_api_base = variational_api_base.rstrip("/")
         self.bingx_api_base = bingx_api_base.rstrip("/")
+        self.okx_api_base = okx_api_base.rstrip("/")
         self.request_timeout_sec = request_timeout_sec
         self.max_lighter_sample_gap_sec = max_lighter_sample_gap_sec
         self._request_json_override = request_json
@@ -217,6 +220,16 @@ class FundingReportService:
                 rows.extend(FundingRow("BingX", symbol, amount) for symbol, amount in totals.items())
             except Exception as exc:
                 warnings.append(f"BingX — не удалось получить полную историю: {type(exc).__name__}.")
+        okx_refs = self._enabled_refs("okx")
+        if okx_refs:
+            try:
+                totals = await fetch_okx_funding(
+                    self.credential_store, okx_refs, start, end,
+                    self._request_json, self.okx_api_base, now=effective_now,
+                )
+                rows.extend(FundingRow("OKX", symbol, amount) for symbol, amount in totals.items())
+            except Exception as exc:
+                warnings.append(f"OKX — не удалось получить полную историю: {type(exc).__name__}.")
         lighter_rows, lighter_warning = self.lighter_rows_for_window(start, end)
         rows.extend(lighter_rows)
         if lighter_warning:

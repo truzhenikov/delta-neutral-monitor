@@ -73,6 +73,7 @@ def get_funding_report_service() -> FundingReportService:
         lighter_api_base=settings.lighter_api_base,
         variational_api_base=settings.variational_api_base,
         bingx_api_base=settings.bingx_api_base,
+        okx_api_base=settings.okx_api_base,
         request_timeout_sec=settings.request_timeout_sec,
     )
 
