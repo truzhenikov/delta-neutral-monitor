@@ -12,6 +12,13 @@ from src.services.credential_store import CredentialStore
 MSK = ZoneInfo("Europe/Moscow")
 
 
+def test_funding_auto_send_is_disabled_by_default(monkeypatch) -> None:
+    from src.config import Settings
+
+    monkeypatch.delenv("FUNDING_REPORT_AUTO_SEND", raising=False)
+    assert Settings().funding_report_auto_send is False
+
+
 def build_store(path: Path, *, with_lighter: bool = True) -> CredentialStore:
     store = CredentialStore(path)
     store.set_exchange_credentials("hyperliquid:main", {"user_address": "0xabc"})

@@ -356,11 +356,12 @@ async def funding_report_loop(bot: Bot, stop_event: asyncio.Event) -> None:
         except Exception as exc:
             logger.warning("lighter_funding_sample_failed error=%s", exc)
         try:
-            chat_ids = resolve_funding_report_chat_ids(
-                preferences,
-                bootstrap_chat_id=settings.telegram_alert_chat_id,
-            )
-            await send_due_funding_reports(bot, funding_report_service, chat_ids)
+            if settings.funding_report_auto_send:
+                chat_ids = resolve_funding_report_chat_ids(
+                    preferences,
+                    bootstrap_chat_id=settings.telegram_alert_chat_id,
+                )
+                await send_due_funding_reports(bot, funding_report_service, chat_ids)
         except Exception as exc:
             logger.warning("funding_report_loop_iteration_failed error=%s", exc)
         try:
