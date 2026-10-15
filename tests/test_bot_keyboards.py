@@ -27,6 +27,7 @@ def test_build_main_menu_keyboard_contains_core_and_admin_buttons() -> None:
         "Алерты ВЫКЛ",
         "День ВКЛ",
         "День ВЫКЛ",
+        "Фандинг за день",
         "Настроить биржу",
         "Биржи",
         "Включить биржу",
@@ -36,6 +37,7 @@ def test_build_main_menu_keyboard_contains_core_and_admin_buttons() -> None:
     ]
     assert parse_main_menu_button("Статус") == "/status"
     assert parse_main_menu_button("Дневные снепшоты") == "/daily_snapshots"
+    assert parse_main_menu_button("Фандинг за день") == "/funding_day"
     assert parse_main_menu_button("Настроить биржу") == "/setup"
     assert parse_main_menu_button("Отмена") == "/cancel"
 
@@ -49,6 +51,7 @@ def test_build_main_menu_keyboard_without_admin_buttons() -> None:
     texts = [button.text for button in buttons]
 
     assert "Настроить биржу" not in texts
+    assert "Фандинг за день" not in texts
     assert "Включить биржу" not in texts
     assert "Удалить биржу" not in texts
 

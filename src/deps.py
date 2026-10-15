@@ -10,6 +10,7 @@ from src.services.alerting import AlertingService
 from src.services.credential_store import CredentialStore
 from src.services.credential_validation import CredentialValidationService, build_default_credential_validation_service
 from src.services.daily_report_service import DailyReportService
+from src.services.funding_report_service import FundingReportService
 from src.services.history_service import HistoryService
 from src.services.monitoring import MonitoringService
 from src.services.status_service import StatusService
@@ -60,6 +61,18 @@ def get_alerting_service() -> AlertingService:
 @lru_cache(maxsize=1)
 def get_daily_report_service() -> DailyReportService:
     return DailyReportService(history_service=get_history_service())
+
+
+@lru_cache(maxsize=1)
+def get_funding_report_service() -> FundingReportService:
+    settings = get_settings()
+    return FundingReportService(
+        credential_store=get_credential_store(),
+        state_path=Path(settings.funding_report_state_path),
+        hyperliquid_api_base=settings.hyperliquid_api_base,
+        lighter_api_base=settings.lighter_api_base,
+        request_timeout_sec=settings.request_timeout_sec,
+    )
 
 
 @lru_cache(maxsize=1)

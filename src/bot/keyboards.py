@@ -22,6 +22,7 @@ _MAIN_MENU_ROWS = [
     [("День ВКЛ", "/daily_on"), ("День ВЫКЛ", "/daily_off")],
 ]
 _ADMIN_MENU_ROWS = [
+    [("Фандинг за день", "/funding_day")],
     [("Настроить биржу", "/setup"), ("Биржи", "/exchanges")],
     [("Включить биржу", "/enable_exchange"), ("Выключить биржу", "/disable_exchange")],
     [("Удалить биржу", "/remove_exchange"), ("Отмена", "/cancel")],

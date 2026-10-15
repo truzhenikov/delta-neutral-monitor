@@ -21,6 +21,7 @@ from src.bot.command_logic import (
     toggle_daily_reports,
 )
 from src.bot.rendering import build_copy_block_tsv
+from src.services.funding_report_service import render_funding_report
 from src.bot.keyboards import (
     build_alert_settings_keyboard,
     build_exchange_toggle_keyboard,
@@ -41,7 +42,7 @@ from src.deps import (
     get_credential_store,
     get_credential_validation_service,
     get_daily_report_service,
-    get_history_service,
+    get_funding_report_service,
     get_telegram_preferences_service,
 )
 
@@ -115,6 +116,13 @@ def render_positions_text(status: dict) -> str:
                 f"{p['symbol']} {p['side']} size={size_text} mark={mark_text} liq={liquidation_text}"
             )
     return "\n".join(lines)
+
+
+def resolve_funding_report_chat_ids(preferences, bootstrap_chat_id: str = "") -> list[str]:
+    chat_ids = set(preferences.list_daily_report_chat_ids())
+    if bootstrap_chat_id.strip():
+        chat_ids.add(bootstrap_chat_id.strip())
+    return sorted(chat_ids)
 
 
 def resolve_alert_chat_ids(preferences, bootstrap_chat_id: str = "") -> list[str]:
@@ -227,6 +235,33 @@ async def send_due_daily_reports(bot: Any, preferences, daily_report_service, st
             preferences.mark_daily_report_sent(chat_id, report_day_key)
 
 
+async def send_due_funding_reports(
+    bot: Any,
+    funding_report_service,
+    chat_ids: list[str],
+    *,
+    now: datetime | None = None,
+) -> None:
+    effective_now = now or datetime.now(timezone.utc)
+    _start, window_end = funding_report_service.completed_window(effective_now)
+    due_chat_ids = [
+        str(chat_id)
+        for chat_id in sorted(set(chat_ids))
+        if funding_report_service.should_send(str(chat_id), effective_now)
+    ]
+    if not due_chat_ids:
+        return
+    report = await funding_report_service.build_report(effective_now)
+    if not report.complete:
+        logger.warning("funding_report_incomplete window_end=%s warnings=%s", window_end.isoformat(), report.warnings)
+        return
+    text = render_funding_report(report)
+    for chat_id in due_chat_ids:
+        sent = await safe_send_message(bot, chat_id, text, context="funding_report")
+        if sent:
+            funding_report_service.mark_sent(chat_id, window_end)
+
+
 async def send_heartbeat_if_due(
     bot: Any,
     preferences,
@@ -310,6 +345,30 @@ async def daily_report_loop(bot: Bot, stop_event: asyncio.Event) -> None:
             continue
 
 
+async def funding_report_loop(bot: Bot, stop_event: asyncio.Event) -> None:
+    settings = get_settings()
+    preferences = get_telegram_preferences_service()
+    funding_report_service = get_funding_report_service()
+
+    while not stop_event.is_set():
+        try:
+            await funding_report_service.capture_lighter_sample()
+        except Exception as exc:
+            logger.warning("lighter_funding_sample_failed error=%s", exc)
+        try:
+            chat_ids = resolve_funding_report_chat_ids(
+                preferences,
+                bootstrap_chat_id=settings.telegram_alert_chat_id,
+            )
+            await send_due_funding_reports(bot, funding_report_service, chat_ids)
+        except Exception as exc:
+            logger.warning("funding_report_loop_iteration_failed error=%s", exc)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=settings.alert_poll_interval_sec)
+        except TimeoutError:
+            continue
+
+
 async def run_bot() -> None:
     from aiogram import Bot, Dispatcher, F
     from aiogram.filters import Command
@@ -379,6 +438,19 @@ async def run_bot() -> None:
         daily_report_service = get_daily_report_service()
         rows = [current for current, _previous in daily_report_service.build_recent_reports(limit=10)]
         await message.answer(build_daily_snapshots_reply({"daily_changes": rows}))
+
+    async def send_funding_reply(message: Message) -> None:
+        preferences = get_telegram_preferences_service()
+        if not preferences.is_admin(str(message.chat.id)):
+            await message.answer("Отчёт по фандингу доступен только администратору.")
+            return
+        funding_report_service = get_funding_report_service()
+        try:
+            await funding_report_service.capture_lighter_sample()
+        except Exception as exc:
+            logger.warning("lighter_funding_sample_failed context=button error=%s", exc)
+        report = await funding_report_service.build_report()
+        await message.answer(render_funding_report(report))
 
     async def send_alert_settings_reply(message: Message) -> None:
         preferences = get_telegram_preferences_service()
@@ -493,6 +565,10 @@ async def run_bot() -> None:
     @dp.message(Command("daily_snapshots"))
     async def daily_snapshots_cmd(message: Message) -> None:
         await send_daily_snapshots_reply(message)
+
+    @dp.message(Command("funding_day"))
+    async def funding_day_cmd(message: Message) -> None:
+        await send_funding_reply(message)
 
     @dp.message(Command("alerts"))
     async def alerts_cmd(message: Message) -> None:
@@ -639,6 +715,8 @@ async def run_bot() -> None:
             await send_daily_reply(message)
         elif menu_command == "/daily_snapshots":
             await send_daily_snapshots_reply(message)
+        elif menu_command == "/funding_day":
+            await send_funding_reply(message)
         elif menu_command == "/alerts":
             await send_alert_settings_reply(message)
         elif menu_command == "/alerts_on":
@@ -666,6 +744,7 @@ async def run_bot() -> None:
     tasks = [
         asyncio.create_task(alert_loop(bot, stop_event, urgent_bot=urgent_bot)),
         asyncio.create_task(daily_report_loop(bot, stop_event)),
+        asyncio.create_task(funding_report_loop(bot, stop_event)),
     ]
 
     try:

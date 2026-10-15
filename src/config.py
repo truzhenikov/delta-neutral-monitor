@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     urgent_alert_liq_distance_pct: float = Field(default=4.0, alias="URGENT_ALERT_LIQ_DISTANCE_PCT")
     urgent_alert_max_abs_net_delta_usd: float = Field(default=500.0, alias="URGENT_ALERT_MAX_ABS_NET_DELTA_USD")
     telegram_state_path: str = Field(default="data/telegram/state.json", alias="TELEGRAM_STATE_PATH")
+    funding_report_state_path: str = Field(default="data/funding-report/state.json", alias="FUNDING_REPORT_STATE_PATH")
     credential_store_path: str = Field(default="data/credentials/exchanges.json", alias="CREDENTIAL_STORE_PATH")
     telegram_admin_chat_ids: str = Field(default="", alias="TELEGRAM_ADMIN_CHAT_IDS")
     telegram_daily_report_hour_utc: int = Field(default=7, alias="TELEGRAM_DAILY_REPORT_HOUR_UTC")
