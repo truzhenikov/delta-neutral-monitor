@@ -71,6 +71,7 @@ def get_funding_report_service() -> FundingReportService:
         state_path=Path(settings.funding_report_state_path),
         hyperliquid_api_base=settings.hyperliquid_api_base,
         lighter_api_base=settings.lighter_api_base,
+        variational_api_base=settings.variational_api_base,
         request_timeout_sec=settings.request_timeout_sec,
     )
 
