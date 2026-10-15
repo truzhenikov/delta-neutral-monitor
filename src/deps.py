@@ -76,6 +76,8 @@ def get_funding_report_service() -> FundingReportService:
         okx_api_base=settings.okx_api_base,
         ondo_api_base=settings.ondo_api_base,
         aster_api_base=settings.aster_api_base,
+        gate_api_base=settings.gate_api_base,
+        gate_settle_currency=settings.gate_settle_currency,
         request_timeout_sec=settings.request_timeout_sec,
     )
 

@@ -221,7 +221,9 @@ def test_dependency_wires_configured_ondo_origin(monkeypatch):
     settings = SimpleNamespace(funding_report_state_path='/tmp/not-written.json', hyperliquid_api_base='hl',
                                lighter_api_base='lighter', variational_api_base='variational',
                                bingx_api_base='bingx', okx_api_base='okx', ondo_api_base=BASE,
-                               aster_api_base='https://fapi.asterdex.com', request_timeout_sec=3)
+                               aster_api_base='https://fapi.asterdex.com',
+                               gate_api_base='https://api.gateio.ws/api/v4',
+                               gate_settle_currency='usdt', request_timeout_sec=3)
     monkeypatch.setattr(deps, 'get_settings', lambda: settings)
     monkeypatch.setattr(deps, 'get_credential_store', lambda: None)
     deps.get_funding_report_service.cache_clear()

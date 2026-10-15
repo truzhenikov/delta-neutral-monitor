@@ -6,6 +6,7 @@ import tempfile
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from functools import partial
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 from zoneinfo import ZoneInfo
@@ -15,6 +16,7 @@ import httpx
 from src.services.aster_funding import fetch_aster_funding
 from src.services.bingx_funding import fetch_bingx_funding
 from src.services.credential_store import CredentialStore
+from src.services.gate_funding import fetch_gate_funding
 from src.services.okx_funding import fetch_okx_funding
 from src.services.ondo_funding import fetch_ondo_funding
 from src.services.variational_funding import fetch_variational_funding
@@ -57,6 +59,8 @@ class FundingReportService:
         okx_api_base: str = "https://www.okx.com",
         ondo_api_base: str = "https://api.ondoperps.xyz",
         aster_api_base: str = "https://fapi.asterdex.com",
+        gate_api_base: str = "https://api.gateio.ws/api/v4",
+        gate_settle_currency: str = "usdt",
         request_timeout_sec: float = 20.0,
         max_lighter_sample_gap_sec: int = 900,
         request_json: _RequestJson | None = None,
@@ -70,6 +74,8 @@ class FundingReportService:
         self.okx_api_base = okx_api_base.rstrip("/")
         self.ondo_api_base = ondo_api_base.rstrip("/")
         self.aster_api_base = aster_api_base.rstrip("/")
+        self.gate_api_base = gate_api_base
+        self.gate_settle_currency = gate_settle_currency
         self.request_timeout_sec = request_timeout_sec
         self.max_lighter_sample_gap_sec = max_lighter_sample_gap_sec
         self._request_json_override = request_json
@@ -256,6 +262,16 @@ class FundingReportService:
                 rows.extend(FundingRow("Aster", symbol, amount) for symbol, amount in totals.items())
             except Exception as exc:
                 warnings.append(f"Aster — не удалось получить полную историю: {type(exc).__name__}.")
+        gate_refs = self._enabled_refs("gate")
+        if gate_refs:
+            try:
+                totals = await fetch_gate_funding(
+                    self.credential_store, gate_refs, start, end,
+                    partial(self._request_json, decimal_json=True), self.gate_api_base, self.gate_settle_currency,
+                )
+                rows.extend(FundingRow("Gate", symbol, amount) for symbol, amount in totals.items())
+            except Exception as exc:
+                warnings.append(f"Gate — не удалось получить полную историю: {type(exc).__name__}.")
         lighter_rows, lighter_warning = self.lighter_rows_for_window(start, end)
         rows.extend(lighter_rows)
         if lighter_warning:
@@ -387,13 +403,15 @@ class FundingReportService:
             if self.credential_store.get_base_exchange(ref) == base_exchange
         ]
 
-    async def _request_json(self, method: str, url: str, **kwargs: Any) -> Any:
+    async def _request_json(self, method: str, url: str, *, decimal_json: bool = False, **kwargs: Any) -> Any:
         if self._request_json_override is not None:
             return await self._request_json_override(method, url, **kwargs)
         async with httpx.AsyncClient(timeout=self.request_timeout_sec) as client:
             response = await client.request(method, url, **kwargs)
             response.raise_for_status()
-            return response.json()
+            # Gate's fractional-second JSON numbers must never pass through a
+            # binary float before half-open boundary attribution.
+            return response.json(parse_float=Decimal) if decimal_json else response.json()
 
     def _read_state(self) -> dict[str, Any]:
         if not self.state_path.exists():
