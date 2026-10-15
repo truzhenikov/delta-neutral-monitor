@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from src.services.aster_funding import fetch_aster_funding
 from src.services.bingx_funding import fetch_bingx_funding
 from src.services.credential_store import CredentialStore
 from src.services.okx_funding import fetch_okx_funding
@@ -55,6 +56,7 @@ class FundingReportService:
         bingx_api_base: str = "https://open-api.bingx.com",
         okx_api_base: str = "https://www.okx.com",
         ondo_api_base: str = "https://api.ondoperps.xyz",
+        aster_api_base: str = "https://fapi.asterdex.com",
         request_timeout_sec: float = 20.0,
         max_lighter_sample_gap_sec: int = 900,
         request_json: _RequestJson | None = None,
@@ -67,6 +69,7 @@ class FundingReportService:
         self.bingx_api_base = bingx_api_base.rstrip("/")
         self.okx_api_base = okx_api_base.rstrip("/")
         self.ondo_api_base = ondo_api_base.rstrip("/")
+        self.aster_api_base = aster_api_base.rstrip("/")
         self.request_timeout_sec = request_timeout_sec
         self.max_lighter_sample_gap_sec = max_lighter_sample_gap_sec
         self._request_json_override = request_json
@@ -243,6 +246,16 @@ class FundingReportService:
                 rows.extend(FundingRow("Ondo", symbol, amount) for symbol, amount in totals.items())
             except Exception as exc:
                 warnings.append(f"Ondo — не удалось получить полную историю: {type(exc).__name__}.")
+        aster_refs = self._enabled_refs("aster")
+        if aster_refs:
+            try:
+                totals = await fetch_aster_funding(
+                    self.credential_store, aster_refs, start, end,
+                    self._request_json, self.aster_api_base,
+                )
+                rows.extend(FundingRow("Aster", symbol, amount) for symbol, amount in totals.items())
+            except Exception as exc:
+                warnings.append(f"Aster — не удалось получить полную историю: {type(exc).__name__}.")
         lighter_rows, lighter_warning = self.lighter_rows_for_window(start, end)
         rows.extend(lighter_rows)
         if lighter_warning:

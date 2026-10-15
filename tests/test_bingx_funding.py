@@ -206,11 +206,13 @@ def test_dependency_wires_bingx_base(monkeypatch):
         lighter_api_base='lighter', variational_api_base='variational',
         bingx_api_base='https://open-api.bingx.com', okx_api_base='https://www.okx.com',
         ondo_api_base='https://api.ondoperps.xyz',
+        aster_api_base='https://fapi.asterdex.com',
         request_timeout_sec=3))
     monkeypatch.setattr(deps, 'get_credential_store', lambda: None)
     deps.get_funding_report_service.cache_clear()
     try:
         assert deps.get_funding_report_service().bingx_api_base == 'https://open-api.bingx.com'
         assert deps.get_funding_report_service().ondo_api_base == 'https://api.ondoperps.xyz'
+        assert deps.get_funding_report_service().aster_api_base == 'https://fapi.asterdex.com'
     finally:
         deps.get_funding_report_service.cache_clear()

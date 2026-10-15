@@ -75,6 +75,7 @@ def get_funding_report_service() -> FundingReportService:
         bingx_api_base=settings.bingx_api_base,
         okx_api_base=settings.okx_api_base,
         ondo_api_base=settings.ondo_api_base,
+        aster_api_base=settings.aster_api_base,
         request_timeout_sec=settings.request_timeout_sec,
     )
 
