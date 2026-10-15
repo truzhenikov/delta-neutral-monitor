@@ -59,6 +59,55 @@ class AlertingService:
 
         return messages
 
+    def collect_pending_urgent_alerts(
+        self,
+        status: StatusOut,
+        *,
+        min_liq_distance_pct: float,
+        max_abs_net_delta_usd: float,
+    ) -> list[AlertMessage]:
+        now = datetime.now(timezone.utc)
+        messages: list[AlertMessage] = []
+
+        net_delta = float(status.risk.net_delta_usd)
+        if abs(net_delta) > max_abs_net_delta_usd:
+            key = "urgent:net_delta"
+            if self._is_due(key, now):
+                messages.append(
+                    AlertMessage(
+                        key=key,
+                        text=(
+                            f"🚨 URGENT DELTA: net delta {net_delta:.2f} USD exceeds "
+                            f"{max_abs_net_delta_usd:.2f} USD"
+                        ),
+                    )
+                )
+
+        for account in status.accounts:
+            for position in account.positions:
+                if position.liquidation_price is None or position.mark_price <= 0:
+                    continue
+                if position.side == "long":
+                    distance = (position.mark_price - position.liquidation_price) / position.mark_price * 100
+                else:
+                    distance = (position.liquidation_price - position.mark_price) / position.mark_price * 100
+                if distance >= min_liq_distance_pct:
+                    continue
+                key = f"urgent:liquidation:{position.exchange}:{position.symbol}:{position.side}"
+                if self._is_due(key, now):
+                    messages.append(
+                        AlertMessage(
+                            key=key,
+                            text=(
+                                f"🚨 URGENT LIQUIDATION: {position.exchange} {position.symbol} "
+                                f"({position.side}) distance {distance:.2f}% is below "
+                                f"{min_liq_distance_pct:.2f}%"
+                            ),
+                        )
+                    )
+
+        return messages
+
     def collect_pending_token_expiry_alerts(
         self,
         credential_store: CredentialStore,

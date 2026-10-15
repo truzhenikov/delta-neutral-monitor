@@ -183,6 +183,28 @@ async def send_alerts_for_snapshot(
         alerting_service.mark_sent(key)
 
 
+async def send_urgent_alerts_for_snapshot(
+    bot: Any,
+    snapshot: StatusOut,
+    alerting_service,
+    *,
+    chat_id: str,
+    min_liq_distance_pct: float,
+    max_abs_net_delta_usd: float,
+) -> None:
+    if not chat_id.strip():
+        return
+    pending_alerts = alerting_service.collect_pending_urgent_alerts(
+        snapshot,
+        min_liq_distance_pct=min_liq_distance_pct,
+        max_abs_net_delta_usd=max_abs_net_delta_usd,
+    )
+    for alert in pending_alerts:
+        sent = await safe_send_message(bot, chat_id.strip(), alert.text, context="urgent_alert")
+        if sent:
+            alerting_service.mark_sent(alert.key)
+
+
 async def send_due_daily_reports(bot: Any, preferences, daily_report_service, status: dict | None = None, now: datetime | None = None) -> None:
     effective_now = now or datetime.now(timezone.utc)
     report_day_key = daily_report_service.report_day_key(effective_now)
@@ -231,7 +253,7 @@ async def send_heartbeat_if_due(
     return current_monotonic if delivered else last_heartbeat_at
 
 
-async def alert_loop(bot: Bot, stop_event: asyncio.Event) -> None:
+async def alert_loop(bot: Bot, stop_event: asyncio.Event, urgent_bot: Bot | None = None) -> None:
     settings = get_settings()
     alerting_service = get_alerting_service()
     preferences = get_telegram_preferences_service()
@@ -247,6 +269,15 @@ async def alert_loop(bot: Bot, stop_event: asyncio.Event) -> None:
                 alerting_service,
                 bootstrap_chat_id=settings.telegram_alert_chat_id,
             )
+            if urgent_bot is not None:
+                await send_urgent_alerts_for_snapshot(
+                    urgent_bot,
+                    snapshot,
+                    alerting_service,
+                    chat_id=settings.telegram_urgent_chat_id,
+                    min_liq_distance_pct=settings.urgent_alert_liq_distance_pct,
+                    max_abs_net_delta_usd=settings.urgent_alert_max_abs_net_delta_usd,
+                )
             last_heartbeat_at = await send_heartbeat_if_due(
                 bot,
                 preferences,
@@ -287,8 +318,13 @@ async def run_bot() -> None:
     settings = get_settings()
     if not settings.telegram_bot_token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is empty")
+    urgent_configured = bool(settings.telegram_urgent_bot_token.strip())
+    urgent_chat_configured = bool(settings.telegram_urgent_chat_id.strip())
+    if urgent_configured != urgent_chat_configured:
+        raise RuntimeError("TELEGRAM_URGENT_BOT_TOKEN and TELEGRAM_URGENT_CHAT_ID must be configured together")
 
     bot = Bot(token=settings.telegram_bot_token)
+    urgent_bot = Bot(token=settings.telegram_urgent_bot_token) if urgent_configured else None
     dp = Dispatcher()
     setup_flow = TelegramSetupFlow(
         preferences=get_telegram_preferences_service(),
@@ -628,7 +664,7 @@ async def run_bot() -> None:
 
     stop_event = asyncio.Event()
     tasks = [
-        asyncio.create_task(alert_loop(bot, stop_event)),
+        asyncio.create_task(alert_loop(bot, stop_event, urgent_bot=urgent_bot)),
         asyncio.create_task(daily_report_loop(bot, stop_event)),
     ]
 
@@ -641,6 +677,8 @@ async def run_bot() -> None:
         for task in tasks:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        if urgent_bot is not None:
+            await urgent_bot.session.close()
 
 
 if __name__ == "__main__":

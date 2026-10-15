@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
     telegram_alert_chat_id: str = Field(default="", alias="TELEGRAM_ALERT_CHAT_ID")
+    telegram_urgent_bot_token: str = Field(default="", alias="TELEGRAM_URGENT_BOT_TOKEN")
+    telegram_urgent_chat_id: str = Field(default="", alias="TELEGRAM_URGENT_CHAT_ID")
+    urgent_alert_liq_distance_pct: float = Field(default=4.0, alias="URGENT_ALERT_LIQ_DISTANCE_PCT")
+    urgent_alert_max_abs_net_delta_usd: float = Field(default=500.0, alias="URGENT_ALERT_MAX_ABS_NET_DELTA_USD")
     telegram_state_path: str = Field(default="data/telegram/state.json", alias="TELEGRAM_STATE_PATH")
     credential_store_path: str = Field(default="data/credentials/exchanges.json", alias="CREDENTIAL_STORE_PATH")
     telegram_admin_chat_ids: str = Field(default="", alias="TELEGRAM_ADMIN_CHAT_IDS")

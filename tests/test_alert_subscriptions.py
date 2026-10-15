@@ -120,8 +120,26 @@ def test_cooldown_is_global_across_broadcasted_chats(tmp_path: Path) -> None:
     alerting = AlertingService(cooldown_sec=300)
     status = build_status()
 
-    asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
-    asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
+    asyncio.run(
+        send_alerts_for_snapshot(
+            bot,
+            status,
+            prefs,
+            alerting,
+            bootstrap_chat_id="",
+            credential_store=CredentialStore(storage_path=tmp_path / "credentials.json"),
+        )
+    )
+    asyncio.run(
+        send_alerts_for_snapshot(
+            bot,
+            status,
+            prefs,
+            alerting,
+            bootstrap_chat_id="",
+            credential_store=CredentialStore(storage_path=tmp_path / "credentials.json"),
+        )
+    )
 
     sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
     assert len(sent_messages) == 4
@@ -138,7 +156,16 @@ def test_send_alerts_for_snapshot_swallows_send_failures(tmp_path: Path) -> None
     alerting = AlertingService(cooldown_sec=300)
     status = build_status()
 
-    asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
+    asyncio.run(
+        send_alerts_for_snapshot(
+            bot,
+            status,
+            prefs,
+            alerting,
+            bootstrap_chat_id="",
+            credential_store=CredentialStore(storage_path=tmp_path / "credentials.json"),
+        )
+    )
 
     assert bot.send_message.await_count > 0
 
@@ -158,8 +185,26 @@ def test_failed_alert_delivery_does_not_consume_cooldown(tmp_path: Path) -> None
     alerting = AlertingService(cooldown_sec=300)
     status = build_status()
 
-    asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
-    asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
+    asyncio.run(
+        send_alerts_for_snapshot(
+            bot,
+            status,
+            prefs,
+            alerting,
+            bootstrap_chat_id="",
+            credential_store=CredentialStore(storage_path=tmp_path / "credentials.json"),
+        )
+    )
+    asyncio.run(
+        send_alerts_for_snapshot(
+            bot,
+            status,
+            prefs,
+            alerting,
+            bootstrap_chat_id="",
+            credential_store=CredentialStore(storage_path=tmp_path / "credentials.json"),
+        )
+    )
 
     sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
     assert len(sent_messages) == 4
@@ -177,7 +222,16 @@ def test_send_alerts_for_snapshot_respects_chat_specific_liq_threshold(tmp_path:
     alerting = AlertingService(cooldown_sec=300)
     status = build_status()
 
-    asyncio.run(send_alerts_for_snapshot(bot, status, prefs, alerting, bootstrap_chat_id=""))
+    asyncio.run(
+        send_alerts_for_snapshot(
+            bot,
+            status,
+            prefs,
+            alerting,
+            bootstrap_chat_id="",
+            credential_store=CredentialStore(storage_path=tmp_path / "credentials.json"),
+        )
+    )
 
     sent_messages = [kwargs for _, kwargs in bot.send_message.await_args_list]
     liq_messages = [item for item in sent_messages if "Min liquidation distance" in item["text"]]
@@ -253,3 +307,58 @@ def test_send_alerts_for_snapshot_includes_variational_token_expiry_alert(tmp_pa
 
     texts = [kwargs["text"] for _, kwargs in bot.send_message.await_args_list]
     assert any(text.startswith("TOKEN EXPIRING [variational:main]") for text in texts)
+
+
+def test_collect_pending_urgent_alerts_uses_strict_liq_and_delta_thresholds() -> None:
+    alerting = AlertingService(cooldown_sec=300)
+    status = build_status()
+    status.risk.net_delta_usd = -500.01
+    status.accounts[0].positions[0].liquidation_price = 96.01
+
+    alerts = alerting.collect_pending_urgent_alerts(
+        status,
+        min_liq_distance_pct=4.0,
+        max_abs_net_delta_usd=500.0,
+    )
+
+    assert len(alerts) == 2
+    assert any("URGENT LIQUIDATION" in alert.text and "3.99%" in alert.text for alert in alerts)
+    assert any("URGENT DELTA" in alert.text and "-500.01 USD" in alert.text for alert in alerts)
+
+    boundary_status = build_status()
+    boundary_status.risk.net_delta_usd = 500.0
+    boundary_status.accounts[0].positions[0].liquidation_price = 96.0
+    boundary_alerts = AlertingService(cooldown_sec=300).collect_pending_urgent_alerts(
+        boundary_status,
+        min_liq_distance_pct=4.0,
+        max_abs_net_delta_usd=500.0,
+    )
+    assert boundary_alerts == []
+
+
+def test_send_urgent_alerts_for_snapshot_uses_only_urgent_bot() -> None:
+    from src.bot.run import send_urgent_alerts_for_snapshot
+
+    urgent_bot = AsyncMock()
+    main_bot = AsyncMock()
+    status = build_status()
+    status.risk.net_delta_usd = 750.0
+    status.accounts[0].positions[0].liquidation_price = 97.0
+    alerting = AlertingService(cooldown_sec=300)
+
+    asyncio.run(
+        send_urgent_alerts_for_snapshot(
+            urgent_bot,
+            status,
+            alerting,
+            chat_id="999",
+            min_liq_distance_pct=4.0,
+            max_abs_net_delta_usd=500.0,
+        )
+    )
+
+    sent_messages = [kwargs for _, kwargs in urgent_bot.send_message.await_args_list]
+    assert len(sent_messages) == 2
+    assert {item["chat_id"] for item in sent_messages} == {"999"}
+    assert all(item["text"].startswith("🚨") for item in sent_messages)
+    main_bot.send_message.assert_not_awaited()

@@ -9,6 +9,7 @@ import pytest
 
 from src.core.schemas import StatusOut
 from src.services.alerting import AlertingService
+from src.services.credential_store import CredentialStore
 from src.services.telegram_preferences import TelegramPreferencesService
 
 
@@ -172,6 +173,11 @@ def test_alert_loop_uses_shared_backend_snapshot_instead_of_local_monitoring(
     )
     monkeypatch.setattr(run, "get_telegram_preferences_service", lambda: prefs)
     monkeypatch.setattr(run, "get_alerting_service", lambda: AlertingService(cooldown_sec=0))
+    monkeypatch.setattr(
+        run,
+        "get_credential_store",
+        lambda: CredentialStore(storage_path=tmp_path / "credentials.json"),
+    )
     monkeypatch.setattr(run, "collect_status_snapshot", fake_collect_status_snapshot)
     asyncio.run(run.alert_loop(bot, stop_event))
 
@@ -212,6 +218,11 @@ def test_alert_loop_retries_after_backend_timeout(monkeypatch: pytest.MonkeyPatc
     )
     monkeypatch.setattr(run, "get_telegram_preferences_service", lambda: prefs)
     monkeypatch.setattr(run, "get_alerting_service", lambda: AlertingService(cooldown_sec=0))
+    monkeypatch.setattr(
+        run,
+        "get_credential_store",
+        lambda: CredentialStore(storage_path=tmp_path / "credentials.json"),
+    )
     monkeypatch.setattr(run, "collect_status_snapshot", fake_collect_status_snapshot)
     monkeypatch.setattr(run.asyncio, "wait_for", fake_wait_for)
 
