@@ -72,6 +72,7 @@ def get_funding_report_service() -> FundingReportService:
         hyperliquid_api_base=settings.hyperliquid_api_base,
         lighter_api_base=settings.lighter_api_base,
         variational_api_base=settings.variational_api_base,
+        bingx_api_base=settings.bingx_api_base,
         request_timeout_sec=settings.request_timeout_sec,
     )
 
