@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     phemex_api_secret: str = Field(default="", alias="PHEMEX_API_SECRET")
     phemex_margin_currency: str = Field(default="USDT", alias="PHEMEX_MARGIN_CURRENCY")
 
+    mexc_funding_api_base: str = Field(default="https://contract.mexc.com", alias="MEXC_FUNDING_API_BASE")
     mexc_api_base: str = Field(default="https://api.mexc.com", alias="MEXC_API_BASE")
     mexc_api_key: str = Field(default="", alias="MEXC_API_KEY")
     mexc_api_secret: str = Field(default="", alias="MEXC_API_SECRET")

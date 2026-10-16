@@ -208,6 +208,7 @@ def test_dependency_wires_bingx_base(monkeypatch):
         ondo_api_base='https://api.ondoperps.xyz',
         aster_api_base='https://fapi.asterdex.com',
         gate_api_base='https://api.gateio.ws/api/v4', gate_settle_currency='usdt',
+        woofi_api_base='https://api.orderly.org', mexc_funding_api_base='https://contract.mexc.com',
         request_timeout_sec=3))
     monkeypatch.setattr(deps, 'get_credential_store', lambda: None)
     deps.get_funding_report_service.cache_clear()
