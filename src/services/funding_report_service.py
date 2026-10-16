@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from src.services.arcus_funding import fetch_arcus_funding
 from src.services.aster_funding import fetch_aster_funding
 from src.services.bingx_funding import fetch_bingx_funding
 from src.services.credential_store import CredentialStore
@@ -65,6 +66,7 @@ class FundingReportService:
         gate_settle_currency: str = "usdt",
         woofi_api_base: str = "https://api.orderly.org",
         mexc_funding_api_base: str = "https://contract.mexc.com",
+        arcus_api_base: str = "https://api.arcus.xyz",
         request_timeout_sec: float = 20.0,
         max_lighter_sample_gap_sec: int = 900,
         request_json: _RequestJson | None = None,
@@ -82,6 +84,7 @@ class FundingReportService:
         self.gate_settle_currency = gate_settle_currency
         self.woofi_api_base = woofi_api_base
         self.mexc_funding_api_base = mexc_funding_api_base
+        self.arcus_api_base = arcus_api_base
         self.request_timeout_sec = request_timeout_sec
         self.max_lighter_sample_gap_sec = max_lighter_sample_gap_sec
         self._request_json_override = request_json
@@ -281,6 +284,7 @@ class FundingReportService:
         for venue, label, fetch, api_base in (
             ("woofi", "WOOFi", fetch_woofi_funding, self.woofi_api_base),
             ("mexc", "MEXC", fetch_mexc_funding, self.mexc_funding_api_base),
+            ("arcus", "Arcus", fetch_arcus_funding, self.arcus_api_base),
         ):
             refs = self._enabled_refs(venue)
             if not refs:

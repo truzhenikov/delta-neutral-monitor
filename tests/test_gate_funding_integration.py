@@ -84,6 +84,7 @@ def test_dependency_wires_gate_configuration(monkeypatch):
         okx_api_base='okx', ondo_api_base='ondo', aster_api_base='aster',
         gate_api_base=BASE, gate_settle_currency='btc', request_timeout_sec=3,
         woofi_api_base='https://api.orderly.org', mexc_funding_api_base='https://contract.mexc.com',
+        arcus_api_base='https://api.arcus.xyz',
     )
     monkeypatch.setattr(deps, 'get_settings', lambda: settings)
     monkeypatch.setattr(deps, 'get_credential_store', lambda: None)

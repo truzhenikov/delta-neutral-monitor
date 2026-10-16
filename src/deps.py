@@ -80,6 +80,7 @@ def get_funding_report_service() -> FundingReportService:
         gate_settle_currency=settings.gate_settle_currency,
         woofi_api_base=settings.woofi_api_base,
         mexc_funding_api_base=settings.mexc_funding_api_base,
+        arcus_api_base=settings.arcus_api_base,
         request_timeout_sec=settings.request_timeout_sec,
     )
 
