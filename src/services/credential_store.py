@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +37,8 @@ class CredentialStore:
         # Hyperliquid DEX namespaces (for example xyz, cash, km, flx, io)
         # are optional because the public/default perp namespace needs none.
         "hyperliquid": ("dex",),
+        "lighter": ("read_only_token",),
+        "lighter-rh": ("read_only_token",),
     }
     PROFILE_SEPARATOR = ":"
 
@@ -274,10 +278,15 @@ class CredentialStore:
 
     def _write_state(self, payload: dict[str, dict[str, dict[str, Any]]]) -> None:
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = self.storage_path.with_suffix(self.storage_path.suffix + ".tmp")
-        tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        tmp_path.chmod(0o600)
-        tmp_path.replace(self.storage_path)
+        fd, temporary_path = tempfile.mkstemp(prefix=f".{self.storage_path.name}.", dir=self.storage_path.parent)
+        try:
+            # mkstemp creates 0600 before any secret bytes are serialized.
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, indent=2))
+            os.replace(temporary_path, self.storage_path)
+        finally:
+            if os.path.exists(temporary_path):
+                os.unlink(temporary_path)
 
     def _display_value(self, key: str, value: str) -> str:
         if key == "dex":

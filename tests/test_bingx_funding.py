@@ -203,7 +203,7 @@ def test_dependency_wires_bingx_base(monkeypatch):
     import src.deps as deps
     monkeypatch.setattr(deps, 'get_settings', lambda: SimpleNamespace(
         funding_report_state_path='/tmp/not-written.json', hyperliquid_api_base='hl',
-        lighter_api_base='lighter', variational_api_base='variational',
+        lighter_api_base='lighter', lighter_rh_api_base='lighter-rh', variational_api_base='variational',
         bingx_api_base='https://open-api.bingx.com', okx_api_base='https://www.okx.com',
         ondo_api_base='https://api.ondoperps.xyz',
         aster_api_base='https://fapi.asterdex.com',

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from src.services.credential_store import CredentialStore
 from src.services.credential_validation import CredentialValidationService, build_default_credential_validation_service
+from src.services.lighter_funding import LighterCredentialError, validate_history_token
 from src.services.telegram_preferences import TelegramPreferencesService
 
 
@@ -130,7 +132,19 @@ class TelegramSetupFlow:
             return self._prompt_for_current_field(session)
 
         field_name = self._required_fields(session)[session.field_index]
-        session.payload[field_name] = normalized_text
+        if field_name == "read_only_token":
+            token = normalized_text
+            if token == "-":
+                # Skipping optional input must not destroy a saved token.
+                token = self.credential_store.get_exchange_credentials(self._exchange_ref(session)).get(field_name, "")
+            if token:
+                try:
+                    validate_history_token(session.payload.get("account_index"), token, datetime.now(timezone.utc))
+                except LighterCredentialError as exc:
+                    return f"read_only_token не сохранён: {exc}. Повторите ввод или используйте /cancel."
+                session.payload[field_name] = token
+        else:
+            session.payload[field_name] = normalized_text
         session.field_index += 1
         if session.field_index < len(self._required_fields(session)):
             return self._prompt_for_current_field(session)
@@ -225,7 +239,10 @@ class TelegramSetupFlow:
 
     def _required_fields(self, session: SetupSession) -> tuple[str, ...]:
         assert session.exchange is not None
-        return CredentialStore.SUPPORTED_EXCHANGES[session.exchange]
+        fields = CredentialStore.SUPPORTED_EXCHANGES[session.exchange]
+        if session.exchange in ("lighter", "lighter-rh"):
+            return fields + ("read_only_token",)
+        return fields
 
     def _exchange_ref(self, session: SetupSession) -> str:
         assert session.exchange is not None
@@ -240,4 +257,10 @@ class TelegramSetupFlow:
         exchange = session.exchange or ""
         display_name = FIELD_LABELS.get((exchange, field_name), field_name)
         target = self._exchange_ref(session) if session.profile_name else session.exchange
+        if field_name == "read_only_token":
+            return (
+                f"Введите необязательный read_only_token для истории фандинга {target} "
+                "(ro:account:single|all:expiry:hex), либо '-' чтобы пропустить и сохранить прежний токен. "
+                "Нужен токен именно этого аккаунта и этой площадки. Для отмены используйте /cancel."
+            )
         return f"Введите значение поля {display_name} для {target}. Для отмены используйте /cancel."

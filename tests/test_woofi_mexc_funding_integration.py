@@ -92,7 +92,7 @@ def test_builder_discards_partial_venue_preserves_other_venues(tmp_path, monkeyp
 def test_dependencies_explicitly_wire_both_origins(monkeypatch):
     import src.deps as deps
     settings = SimpleNamespace(funding_report_state_path='unused.json', hyperliquid_api_base='hl',
-        lighter_api_base='lighter', variational_api_base='var', bingx_api_base='bingx', okx_api_base='okx',
+        lighter_api_base='lighter', lighter_rh_api_base='lighter-rh', variational_api_base='var', bingx_api_base='bingx', okx_api_base='okx',
         ondo_api_base='ondo', aster_api_base='aster', gate_api_base='gate', gate_settle_currency='usdt',
         woofi_api_base='https://api.orderly.org', mexc_funding_api_base='https://contract.mexc.com',
         arcus_api_base='https://api.arcus.xyz', request_timeout_sec=3)

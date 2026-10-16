@@ -210,7 +210,7 @@ def test_builder_success_empty_disabled_and_labels(tmp_path):
 
 def test_dependencies_explicitly_wire_arcus_origin(monkeypatch):
     import src.deps as deps
-    fields = ['hyperliquid', 'lighter', 'variational', 'bingx', 'okx', 'ondo', 'aster', 'gate', 'woofi', 'arcus']
+    fields = ['hyperliquid', 'lighter', 'lighter_rh', 'variational', 'bingx', 'okx', 'ondo', 'aster', 'gate', 'woofi', 'arcus']
     settings = SimpleNamespace(**{name+'_api_base': BASE for name in fields}, funding_report_state_path='unused.json',
                                gate_settle_currency='usdt', mexc_funding_api_base='mexc', request_timeout_sec=3)
     monkeypatch.setattr(deps, 'get_settings', lambda: settings)

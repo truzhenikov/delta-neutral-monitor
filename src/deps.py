@@ -71,6 +71,8 @@ def get_funding_report_service() -> FundingReportService:
         state_path=Path(settings.funding_report_state_path),
         hyperliquid_api_base=settings.hyperliquid_api_base,
         lighter_api_base=settings.lighter_api_base,
+        lighter_rh_api_base=settings.lighter_rh_api_base,
+        extended_api_base=getattr(settings, "extended_api_base", "https://api.starknet.extended.exchange"),
         variational_api_base=settings.variational_api_base,
         bingx_api_base=settings.bingx_api_base,
         okx_api_base=settings.okx_api_base,

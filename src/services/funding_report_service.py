@@ -5,7 +5,7 @@ import os
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 from functools import partial
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -17,7 +17,9 @@ from src.services.arcus_funding import fetch_arcus_funding
 from src.services.aster_funding import fetch_aster_funding
 from src.services.bingx_funding import fetch_bingx_funding
 from src.services.credential_store import CredentialStore
+from src.services.extended_funding import ExtendedCredentialError, fetch_extended_funding
 from src.services.gate_funding import fetch_gate_funding
+from src.services.lighter_funding import LighterCredentialError, fetch_lighter_funding
 from src.services.mexc_funding import fetch_mexc_funding
 from src.services.woofi_funding import fetch_woofi_funding
 from src.services.okx_funding import fetch_okx_funding
@@ -46,7 +48,14 @@ class FundingReport:
 
     @property
     def total_usd(self) -> Decimal:
-        return sum((row.amount_usd for row in self.rows), Decimal("0"))
+        if not self.rows:
+            return Decimal("0")
+        values = [row.amount_usd for row in self.rows]
+        with localcontext() as context:
+            context.prec = max(max(value.adjusted() for value in values), 0) - min(
+                min(int(value.as_tuple().exponent) for value in values), 0,
+            ) + len(str(len(values))) + 2
+            return sum(values, Decimal("0"))
 
 
 class FundingReportService:
@@ -57,6 +66,8 @@ class FundingReportService:
         *,
         hyperliquid_api_base: str = "https://api.hyperliquid.xyz",
         lighter_api_base: str = "https://mainnet.zklighter.elliot.ai",
+        lighter_rh_api_base: str = "https://api.rh.lighter.xyz",
+        extended_api_base: str = "https://api.starknet.extended.exchange",
         variational_api_base: str = "https://omni.variational.io",
         bingx_api_base: str = "https://open-api.bingx.com",
         okx_api_base: str = "https://www.okx.com",
@@ -75,6 +86,8 @@ class FundingReportService:
         self.state_path = state_path
         self.hyperliquid_api_base = hyperliquid_api_base.rstrip("/")
         self.lighter_api_base = lighter_api_base.rstrip("/")
+        self.lighter_rh_api_base = lighter_rh_api_base.rstrip("/")
+        self.extended_api_base = extended_api_base.rstrip("/")
         self.variational_api_base = variational_api_base.rstrip("/")
         self.bingx_api_base = bingx_api_base.rstrip("/")
         self.okx_api_base = okx_api_base.rstrip("/")
@@ -297,10 +310,35 @@ class FundingReportService:
                 rows.extend(FundingRow(label, symbol, amount) for symbol, amount in totals.items())
             except Exception as exc:
                 warnings.append(f"{label} — не удалось получить полную историю: {type(exc).__name__}.")
-        lighter_rows, lighter_warning = self.lighter_rows_for_window(start, end)
-        rows.extend(lighter_rows)
-        if lighter_warning:
-            warnings.append(lighter_warning)
+        for venue, label, api_base in (
+            ("lighter", "Lighter", self.lighter_api_base),
+            ("lighter-rh", "Lighterhood", self.lighter_rh_api_base),
+        ):
+            refs = self._enabled_refs(venue)
+            if not refs:
+                continue
+            try:
+                totals = await fetch_lighter_funding(
+                    self.credential_store, refs, start, end,
+                    self._request_json, api_base, now=effective_now,
+                )
+                rows.extend(FundingRow(label, symbol, amount) for symbol, amount in totals.items())
+            except LighterCredentialError as exc:
+                warnings.append(f"{label} — неполные данные за полный период: {exc}.")
+            except Exception as exc:
+                warnings.append(f"{label} — не удалось получить полную историю: {type(exc).__name__}.")
+        extended_refs = self._enabled_refs("extended")
+        if extended_refs:
+            try:
+                totals = await fetch_extended_funding(
+                    self.credential_store, extended_refs, start, end,
+                    self._request_json, self.extended_api_base,
+                )
+                rows.extend(FundingRow("Extended", symbol, amount) for symbol, amount in totals.items())
+            except ExtendedCredentialError as exc:
+                warnings.append(f"Extended — неполные данные за полный период: {exc}.")
+            except Exception as exc:
+                warnings.append(f"Extended — не удалось получить полную историю: {type(exc).__name__}.")
         rows.sort(key=lambda row: (-row.amount_usd, row.exchange, row.symbol))
         return FundingReport(
             start=start,

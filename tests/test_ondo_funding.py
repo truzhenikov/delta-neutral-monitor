@@ -219,7 +219,7 @@ def test_late_profile_failure_preserves_other_venues_not_partial_ondo(tmp_path, 
 def test_dependency_wires_configured_ondo_origin(monkeypatch):
     import src.deps as deps
     settings = SimpleNamespace(funding_report_state_path='/tmp/not-written.json', hyperliquid_api_base='hl',
-                               lighter_api_base='lighter', variational_api_base='variational',
+                               lighter_api_base='lighter', lighter_rh_api_base='lighter-rh', variational_api_base='variational',
                                bingx_api_base='bingx', okx_api_base='okx', ondo_api_base=BASE,
                                aster_api_base='https://fapi.asterdex.com',
                                gate_api_base='https://api.gateio.ws/api/v4',
