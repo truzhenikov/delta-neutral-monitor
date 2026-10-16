@@ -95,7 +95,8 @@ def test_dependencies_explicitly_wire_both_origins(monkeypatch):
         lighter_api_base='lighter', lighter_rh_api_base='lighter-rh', variational_api_base='var', bingx_api_base='bingx', okx_api_base='okx',
         ondo_api_base='ondo', aster_api_base='aster', gate_api_base='gate', gate_settle_currency='usdt',
         woofi_api_base='https://api.orderly.org', mexc_funding_api_base='https://contract.mexc.com',
-        arcus_api_base='https://api.arcus.xyz', request_timeout_sec=3)
+        arcus_api_base='https://api.arcus.xyz',
+        binance_api_base='https://fapi.binance.com', bitget_api_base='https://api.bitget.com', request_timeout_sec=3)
     monkeypatch.setattr(deps, 'get_settings', lambda: settings)
     monkeypatch.setattr(deps, 'get_credential_store', lambda: None)
     deps.get_funding_report_service.cache_clear()

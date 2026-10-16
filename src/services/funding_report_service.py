@@ -16,6 +16,8 @@ import httpx
 from src.services.arcus_funding import fetch_arcus_funding
 from src.services.aster_funding import fetch_aster_funding
 from src.services.bingx_funding import fetch_bingx_funding
+from src.services.binance_funding import fetch_binance_funding
+from src.services.bitget_funding import fetch_bitget_funding
 from src.services.credential_store import CredentialStore
 from src.services.extended_funding import ExtendedCredentialError, fetch_extended_funding
 from src.services.gate_funding import fetch_gate_funding
@@ -78,6 +80,8 @@ class FundingReportService:
         woofi_api_base: str = "https://api.orderly.org",
         mexc_funding_api_base: str = "https://contract.mexc.com",
         arcus_api_base: str = "https://api.arcus.xyz",
+        binance_api_base: str = "https://fapi.binance.com",
+        bitget_api_base: str = "https://api.bitget.com",
         request_timeout_sec: float = 20.0,
         max_lighter_sample_gap_sec: int = 900,
         request_json: _RequestJson | None = None,
@@ -98,6 +102,8 @@ class FundingReportService:
         self.woofi_api_base = woofi_api_base
         self.mexc_funding_api_base = mexc_funding_api_base
         self.arcus_api_base = arcus_api_base
+        self.binance_api_base = binance_api_base
+        self.bitget_api_base = bitget_api_base
         self.request_timeout_sec = request_timeout_sec
         self.max_lighter_sample_gap_sec = max_lighter_sample_gap_sec
         self._request_json_override = request_json
@@ -298,6 +304,8 @@ class FundingReportService:
             ("woofi", "WOOFi", fetch_woofi_funding, self.woofi_api_base),
             ("mexc", "MEXC", fetch_mexc_funding, self.mexc_funding_api_base),
             ("arcus", "Arcus", fetch_arcus_funding, self.arcus_api_base),
+            ("binance", "Binance", fetch_binance_funding, self.binance_api_base),
+            ("bitget", "Bitget", fetch_bitget_funding, self.bitget_api_base),
         ):
             refs = self._enabled_refs(venue)
             if not refs:

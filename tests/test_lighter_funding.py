@@ -329,7 +329,7 @@ def test_setup_without_history_token_keeps_public_credentials_only(tmp_path):
 
 def test_dependencies_explicitly_wire_partner_origin(monkeypatch):
     import src.deps as deps
-    fields = ['hyperliquid', 'lighter', 'lighter_rh', 'variational', 'bingx', 'okx', 'ondo', 'aster', 'gate', 'woofi', 'arcus']
+    fields = ['hyperliquid', 'lighter', 'lighter_rh', 'variational', 'bingx', 'okx', 'ondo', 'aster', 'gate', 'woofi', 'arcus', 'binance', 'bitget']
     settings = SimpleNamespace(**{name+'_api_base': 'https://example.invalid' for name in fields},
                                funding_report_state_path='unused.json', gate_settle_currency='usdt',
                                mexc_funding_api_base='mexc', request_timeout_sec=3)

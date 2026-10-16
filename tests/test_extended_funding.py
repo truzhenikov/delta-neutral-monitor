@@ -249,7 +249,7 @@ def test_real_http_sends_only_api_key_user_agent_and_never_follows_redirects(tmp
 
 def test_dependencies_explicitly_wire_extended_origin(monkeypatch):
     import src.deps as deps
-    fields = ['hyperliquid', 'lighter', 'lighter_rh', 'variational', 'bingx', 'okx', 'ondo', 'aster', 'gate', 'woofi', 'arcus']
+    fields = ['hyperliquid', 'lighter', 'lighter_rh', 'variational', 'bingx', 'okx', 'ondo', 'aster', 'gate', 'woofi', 'arcus', 'binance', 'bitget']
     settings = SimpleNamespace(**{name+'_api_base': 'https://example.invalid' for name in fields},
                                extended_api_base=BASE+'/configured', funding_report_state_path='unused.json',
                                gate_settle_currency='usdt', mexc_funding_api_base='mexc', request_timeout_sec=3)
