@@ -1,6 +1,6 @@
 """Read-only Aster V3 actual funding ledger, complete or fail closed.
 
-USDT/USDC income is reported at nominal USD value, preserving the ledger sign.
+USDT/USDC/USD1 income is reported at nominal USD value, preserving the ledger sign.
 Capped intervals are split, not counted; only uncapped leaves establish coverage.
 """
 from __future__ import annotations
@@ -130,10 +130,14 @@ async def fetch_aster_funding(
                     raise ValueError('invalid Aster funding record')
                 record_id, symbol, event_time = item.get('tranId'), item.get('symbol'), item.get('time')
                 asset, income = item.get('asset'), item.get('income')
+                # JSON integers are exact in Python; never coerce via float or
+                # accept bool (an int subclass). Retain opaque string IDs.
+                if type(record_id) is int and record_id > 0:
+                    record_id = str(record_id)
                 if (
                     not isinstance(record_id, str) or not record_id.strip()
                     or not isinstance(symbol, str) or not _SYMBOL.fullmatch(symbol)
-                    or asset not in ('USDT', 'USDC') or not symbol.endswith(asset)
+                    or asset not in ('USDT', 'USDC', 'USD1') or not symbol.endswith(asset)
                     or len(symbol) <= len(asset) or item.get('incomeType') != 'FUNDING_FEE'
                     or type(event_time) is not int or event_time <= 0
                     or not isinstance(income, str) or not income.strip()
@@ -145,9 +149,10 @@ async def fetch_aster_funding(
                     raise ValueError('invalid Aster funding amount') from None
                 if not amount.is_finite():
                     raise ValueError('non-finite Aster funding amount')
-                if record_id in seen and seen[record_id] != item:
+                normalized = {**item, 'tranId': record_id}
+                if record_id in seen and seen[record_id] != normalized:
                     raise ValueError('conflicting Aster funding transaction')
-                seen[record_id] = item
+                seen[record_id] = normalized
                 parsed.append((record_id, symbol[:-len(asset)], event_time, amount))
             if len(payload) == _PAGE_LIMIT:
                 if high - low <= 1:

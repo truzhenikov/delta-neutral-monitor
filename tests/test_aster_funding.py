@@ -72,12 +72,47 @@ def test_exact_signed_wire_and_half_open_signed_decimal_totals(monkeypatch):
     assert Account.recover_message(typed, signature=signature).lower() == credentials()['signer'].lower()
 
 
+@pytest.mark.parametrize('record_id', [123, 636274374205892020, 10**100])
+def test_positive_integer_transaction_ids_preserve_exact_income(record_id):
+    assert run(AsyncMock(return_value=[row(record_id, income='-1.56258076')])) == {
+        'BTC': Decimal('-1.56258076'),
+    }
+
+
+@pytest.mark.parametrize('symbol,underlying', [('METAUSD1', 'META'), ('BTCUSD1', 'BTC'),
+                                             ('NCCOXAG2USDUSD1', 'NCCOXAG2USD')])
+def test_usd1_settlement_is_nominal_usd_with_exact_suffix(symbol, underlying):
+    assert run(AsyncMock(return_value=[row(symbol=symbol, asset='USD1', income='-1.56258076')])) == {
+        underlying: Decimal('-1.56258076'),
+    }
+
+
+@pytest.mark.parametrize('record_id', [636274374205892020, 10**100])
+def test_string_and_integer_transaction_ids_deduplicate(record_id):
+    assert run(AsyncMock(return_value=[row(record_id), row(str(record_id))])) == {
+        'BTC': Decimal('0.123456789123456789'),
+    }
+
+
+@pytest.mark.parametrize('changes', [{'income': '9'}, {'symbol': 'ETHUSDT'}, {'time': START_MS + 1}])
+def test_normalized_transaction_id_conflicts_fail_closed(changes):
+    with pytest.raises(ValueError, match='conflicting'):
+        run(AsyncMock(return_value=[row(636274374205892020),
+                                    row('636274374205892020', **changes)]))
+
+
 @pytest.mark.parametrize('bad', [
     {'income': 'NaN'}, {'income': 'Infinity'}, {'income': '-Infinity'}, {'income': ''},
     {'income': 'garbage'}, {'income': True}, {'income': 1}, {'income': 0.1},
     {'income': None}, {'asset': 'BTC'}, {'asset': 'usdt'}, {'incomeType': 'REALIZED_PNL'},
     {'time': True}, {'time': str(START_MS)}, {'time': 0}, {'time': None},
-    {'tranId': ''}, {'tranId': 123}, {'tranId': None}, {'symbol': ''},
+    # Positive integer IDs are real API values; retain malformed-ID rejection instead.
+    {'tranId': ''}, {'tranId': True}, {'tranId': False}, {'tranId': 0}, {'tranId': -123},
+    {'tranId': 123.0}, {'tranId': None}, {'symbol': ''},
+    {'asset': 'USD1', 'symbol': 'USD1'}, {'asset': 'USD1', 'symbol': 'METAUSD1USDT'},
+    {'asset': 'USD1', 'symbol': 'METAUSDT'}, {'asset': 'USD', 'symbol': 'METAUSD'},
+    {'asset': 'USD1', 'symbol': 'METAUSD1', 'income': 'NaN'},
+    {'asset': 'USD1', 'symbol': 'METAUSD1', 'income': 'Infinity'},
     {'symbol': 'BTC-USDT'}, {'symbol': 'BTCUSDC'}, {'symbol': 'USDT'}, {'symbol': None},
 ])
 def test_invalid_record_fails_closed(bad):

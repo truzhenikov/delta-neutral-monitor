@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock
 
+import httpx
 from eth_account import Account
 
 from src.services.credential_store import CredentialStore
@@ -39,6 +40,50 @@ def test_aster_signed_amount_in_shared_report(tmp_path):
     report = asyncio.run(service(tmp_path, request).build_report(NOW))
     assert report.complete
     assert [(r.exchange, r.symbol, r.amount_usd) for r in report.rows] == [('Aster', 'BTC', Decimal('-1.25'))]
+
+
+def test_aster_real_numeric_usd1_raw_http_json_is_complete(tmp_path, monkeypatch):
+    # Real API value shapes, including an ID above IEEE-754's exact integer range.
+    # Keep literal HTTP bytes: constructing a dict first would miss JSON coercion.
+    raw = b'''[
+        {"tranId":636274374205892020,"symbol":"METAUSD1","asset":"USD1",
+         "incomeType":"FUNDING_FEE","time":1792195200000,"income":"-1.56258076",
+         "info":"funding settlement","tradeId":"","commission":"0"},
+        {"tranId":636274374205892021,"symbol":"METAUSD1","asset":"USD1",
+         "incomeType":"FUNDING_FEE","time":1792195200000,"income":"0",
+         "info":"zero funding","tradeId":"","commission":"0"}
+    ]'''
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        assert request.method == 'GET'
+        assert request.url.path == '/fapi/v3/income'
+        return httpx.Response(200, content=raw, headers={'content-type': 'application/json'})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, 'AsyncClient', lambda **kwargs: real_client(
+        transport=httpx.MockTransport(respond), **kwargs))
+    s = service(tmp_path, None)
+
+    async def build():
+        payload = await s._request_json('GET', 'https://fapi.asterdex.com/fapi/v3/income')
+        assert type(payload[0]['tranId']) is int
+        assert payload[0]['tranId'] == 636274374205892020
+        assert payload[1]['tranId'] == 636274374205892021
+        return await s.build_report(datetime(2026, 10, 17, 12, tzinfo=MSK))
+
+    report = asyncio.run(build())
+    assert report.complete
+    assert report.warnings == []
+    assert report.start == datetime(2026, 10, 16, 11, 30, tzinfo=MSK)
+    assert report.end == datetime(2026, 10, 17, 11, 30, tzinfo=MSK)
+    assert [(r.exchange, r.symbol, r.amount_usd) for r in report.rows] == [
+        ('Aster', 'META', Decimal('-1.56258076')),
+    ]
+    assert report.total_usd == Decimal('-1.56258076')
+    assert len(requests) == 2
+    assert requests[1].url.params['incomeType'] == 'FUNDING_FEE'
 
 
 def test_aster_error_preserves_other_venues(tmp_path):
