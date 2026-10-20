@@ -85,6 +85,7 @@ def get_funding_report_service() -> FundingReportService:
         arcus_api_base=settings.arcus_api_base,
         binance_api_base=settings.binance_api_base,
         bitget_api_base=settings.bitget_api_base,
+        backpack_api_base=getattr(settings, "backpack_api_base", "https://api.backpack.exchange"),
         request_timeout_sec=settings.request_timeout_sec,
     )
 

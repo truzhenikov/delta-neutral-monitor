@@ -45,7 +45,7 @@ The monitor currently supports **24 exchange integrations** for futures/perpetua
 - WOOFi Pro (Orderly)
 - Aster
 - Arcus
-- Backpack ([read-only connector and limitations](docs/backpack.md))
+- Backpack ([read-only connector and limitations](docs/backpack.md); [historical funding ledger](docs/backpack-funding.md), activation remains opt-in)
 
 Exchange names used in `ENABLED_EXCHANGES` and the Telegram setup flow are the lowercase identifiers: `binance`, `bitget`, `bingx`, `phemex`, `mexc`, `gate`, `pacifica`, `okx`, `kucoin`, `aden`, `vest`, `lighter`, `lighter-rh`, `nado`, `hyperliquid`, `txflow`, `ondo`, `risex`, `variational`, `extended`, `woofi`, `aster`, `arcus`, `backpack`.
 
