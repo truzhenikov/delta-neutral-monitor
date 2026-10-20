@@ -141,6 +141,10 @@ class Settings(BaseSettings):
     aster_signer: str = Field(default="", alias="ASTER_SIGNER")
     aster_signer_private_key: str = Field(default="", alias="ASTER_SIGNER_PRIVATE_KEY")
     arcus_api_base: str = Field(default="https://api.arcus.xyz", alias="ARCUS_API_BASE")
+    backpack_api_base: str = Field(default="https://api.backpack.exchange", alias="BACKPACK_API_BASE")
+    backpack_api_key: str = Field(default="", alias="BACKPACK_API_KEY")
+    backpack_api_secret: str = Field(default="", alias="BACKPACK_API_SECRET")
+
     arcus_address: str = Field(default="", alias="ARCUS_ADDRESS")
     arcus_account_index: int = Field(default=0, alias="ARCUS_ACCOUNT_INDEX")
 

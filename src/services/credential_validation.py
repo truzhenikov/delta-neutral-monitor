@@ -40,4 +40,16 @@ def build_default_credential_validation_service(supported_exchanges: list[str]) 
             message="Проверка учетных данных не выполнялась; данные сохранены.",
         )
 
-    return CredentialValidationService(validators={exchange: _placeholder for exchange in supported_exchanges})
+    async def _backpack(payload: dict[str, str]) -> CredentialValidationResult:
+        from src.connectors.backpack_connector import validate_keypair
+
+        validate_keypair(payload)
+        return CredentialValidationResult(
+            ok=True, checked=False,
+            message="ED25519 keypair validated locally; live account verification not performed.",
+        )
+
+    validators = {exchange: _placeholder for exchange in supported_exchanges}
+    if "backpack" in validators:
+        validators["backpack"] = _backpack
+    return CredentialValidationService(validators=validators)

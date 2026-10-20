@@ -32,6 +32,7 @@ class CredentialStore:
         "woofi": ("account_id", "orderly_key", "orderly_secret"),
         "aster": ("user_address", "signer", "signer_private_key"),
         "arcus": ("address", "account_index"),
+        "backpack": ("api_key", "api_secret"),
     }
     OPTIONAL_EXCHANGE_FIELDS: dict[str, tuple[str, ...]] = {
         # Hyperliquid DEX namespaces (for example xyz, cash, km, flx, io)

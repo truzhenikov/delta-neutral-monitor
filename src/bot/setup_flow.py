@@ -31,6 +31,8 @@ FIELD_LABELS: dict[tuple[str, str], str] = {
     ("aster", "user_address"): "master wallet address (user)",
     ("aster", "signer"): "API Wallet / Agent address (signer)",
     ("aster", "signer_private_key"): "API Wallet / Agent private key",
+    ("backpack", "api_key"): "base64 ED25519 public API key",
+    ("backpack", "api_secret"): "base64 ED25519 private seed (32 bytes)",
     ("arcus", "address"): "master Ethereum address",
     ("arcus", "account_index"): "account index (0-9)",
 }

@@ -20,7 +20,7 @@ For every configured venue it normalizes account state into a common shape and c
 
 ### Supported integrations
 
-The monitor currently supports **23 exchange integrations** for futures/perpetual account monitoring:
+The monitor currently supports **24 exchange integrations** for futures/perpetual account monitoring:
 
 - Binance Futures
 - Bitget
@@ -45,8 +45,9 @@ The monitor currently supports **23 exchange integrations** for futures/perpetua
 - WOOFi Pro (Orderly)
 - Aster
 - Arcus
+- Backpack ([read-only connector and limitations](docs/backpack.md))
 
-Exchange names used in `ENABLED_EXCHANGES` and the Telegram setup flow are the lowercase identifiers: `binance`, `bitget`, `bingx`, `phemex`, `mexc`, `gate`, `pacifica`, `okx`, `kucoin`, `aden`, `vest`, `lighter`, `lighter-rh`, `nado`, `hyperliquid`, `txflow`, `ondo`, `risex`, `variational`, `extended`, `woofi`, `aster`, `arcus`.
+Exchange names used in `ENABLED_EXCHANGES` and the Telegram setup flow are the lowercase identifiers: `binance`, `bitget`, `bingx`, `phemex`, `mexc`, `gate`, `pacifica`, `okx`, `kucoin`, `aden`, `vest`, `lighter`, `lighter-rh`, `nado`, `hyperliquid`, `txflow`, `ondo`, `risex`, `variational`, `extended`, `woofi`, `aster`, `arcus`, `backpack`.
 
 Hyperliquid DEX namespaces are configured separately with `HYPERLIQUID_DEX`. The IO provider is supported as `io`; multiple namespaces can be listed comma-separated, for example `xyz,cash,km,flx,io`. The same `dex` value can be stored in a profiled Hyperliquid credential entry.
 
