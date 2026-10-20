@@ -22,7 +22,10 @@ async def fetch_variational_funding(
     totals: dict[str, Decimal] = {}
     seen: dict[str, dict] = {}
     for ref in refs:
-        token = str(store.get_exchange_credentials(ref).get('vr_token') or '').strip()
+        import asyncio
+        from src.services.variational_sessions import VariationalSessions
+
+        token = (await asyncio.to_thread(VariationalSessions(store).token, ref)).strip()
         if not token:
             raise ValueError('missing Variational token')
         headers = VariationalRealConnector._default_headers(token)
@@ -33,7 +36,7 @@ async def fetch_variational_funding(
         account_ids: set[str] = set()
         while True:
             payload = await request_json(
-                'GET', api_base.rstrip('/') + '/api/transfers', headers=headers,
+                'GET', api_base.rstrip('/') + '/api/transfers', headers=headers, follow_redirects=False,
                 params={
                     'type': 'funding',
                     'created_at_gte': start.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z'),

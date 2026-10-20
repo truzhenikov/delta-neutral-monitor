@@ -122,7 +122,19 @@ class AlertingService:
             if entry.get("base_exchange") != "variational" or not entry.get("enabled"):
                 continue
             exchange_ref = str(entry.get("exchange") or "").strip().lower()
-            raw_token = credential_store.get_exchange_credentials(exchange_ref).get("vr_token", "")
+            from src.services.variational_sessions import SessionError, VariationalSessions
+
+            sessions = VariationalSessions(credential_store)
+            try:
+                # Read only: bot alert collection must never block on refresh I/O.
+                raw_token = sessions.token(exchange_ref, refresh=False)
+                managed = sessions.path(exchange_ref).exists()
+            except SessionError:
+                key = f"token:{exchange_ref}:session-unavailable"
+                if key not in self._sticky_sent_keys:
+                    messages.append(AlertMessage(key, f"TOKEN SESSION UNAVAILABLE [{exchange_ref}]: check the session keeper and reimport if needed."))
+                continue
+            self._sticky_sent_keys.discard(f"token:{exchange_ref}:session-unavailable")
             expires_at = self._decode_jwt_expiry(raw_token)
             if expires_at is None:
                 continue
@@ -145,7 +157,10 @@ class AlertingService:
                 continue
 
             self._sticky_sent_keys.discard(expired_key)
-            if remaining <= warning_window and expiring_key not in self._sticky_sent_keys:
+            # Renewal starts at 150s; the 60s keeper poll needs a grace window.
+            # Warn only for a stalled session at <=30s, not normal renewal eligibility.
+            effective_window = min(warning_window, timedelta(seconds=30)) if managed else warning_window
+            if remaining <= effective_window and expiring_key not in self._sticky_sent_keys:
                 hours_left = int(remaining.total_seconds() // 3600)
                 minutes_left = int((remaining.total_seconds() % 3600) // 60)
                 messages.append(

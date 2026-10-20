@@ -1,0 +1,27 @@
+[Unit]
+Description=Maintain imported Variational Omni cookie sessions
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/root/delta-neutral-monitor
+Environment=APP_ENV=prod
+EnvironmentFile=-/root/delta-neutral-monitor/.env
+ExecStart=/root/delta-neutral-monitor/.venv/bin/python -m src.scripts.variational_sessions keep
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+# Import first so this directory exists. Override this path if the configured
+# CREDENTIAL_STORE_PATH is not data/credentials/exchanges.json.
+ReadWritePaths=/root/delta-neutral-monitor/data/credentials/variational-sessions
+
+[Install]
+WantedBy=multi-user.target

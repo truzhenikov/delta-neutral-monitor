@@ -1442,6 +1442,20 @@ class RisexRealConnector(_BaseRealConnector):
 class VariationalRealConnector(_BaseRealConnector):
     exchange = "variational"
 
+    async def _get(self, base_url: str, path: str, params=None, headers=None):
+        if base_url.rstrip('/') != 'https://omni.variational.io':
+            raise ValueError('untrusted Variational origin')
+        try:
+            async with httpx.AsyncClient(timeout=get_settings().request_timeout_sec,
+                                         follow_redirects=False, trust_env=False) as client:
+                response = await client.get(base_url.rstrip('/') + path, params=params, headers=headers)
+                response.raise_for_status()
+                return response.json()
+        except Exception:
+            # Do not propagate response bodies or httpx request reprs: both can
+            # contain browser credentials. Other venues keep their own transport.
+            raise RealConnectorRequestError('Variational account request failed') from None
+
     @staticmethod
     def _extract_address_from_token(vr_token: str) -> str:
         try:
@@ -1485,8 +1499,16 @@ class VariationalRealConnector(_BaseRealConnector):
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
-        credentials = _runtime_credentials(self.exchange)
-        vr_token = (credentials.get("vr_token") or settings.variational_vr_token).strip()
+        if settings.variational_api_base.rstrip('/') != 'https://omni.variational.io':
+            raise ValueError('untrusted Variational origin')
+        import asyncio
+        from src.services.variational_sessions import VariationalSessions
+
+        store = CredentialStore(Path(settings.credential_store_path))
+        vr_token = (await asyncio.to_thread(
+            VariationalSessions(store).token, self.exchange,
+            fallback=settings.variational_vr_token,
+        )).strip()
         if not vr_token:
             raise RealConnectorNotConfiguredError(
                 "variational vr-token is not configured (VARIATIONAL_VR_TOKEN)"
