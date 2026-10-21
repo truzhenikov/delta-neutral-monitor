@@ -86,6 +86,7 @@ def get_funding_report_service() -> FundingReportService:
         binance_api_base=settings.binance_api_base,
         bitget_api_base=settings.bitget_api_base,
         backpack_api_base=getattr(settings, "backpack_api_base", "https://api.backpack.exchange"),
+        polymarket_api_base=getattr(settings, "polymarket_api_base", "https://api.perpetuals.polymarket.com"),
         request_timeout_sec=settings.request_timeout_sec,
     )
 

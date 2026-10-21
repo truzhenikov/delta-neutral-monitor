@@ -145,6 +145,9 @@ class Settings(BaseSettings):
     backpack_api_key: str = Field(default="", alias="BACKPACK_API_KEY")
     backpack_api_secret: str = Field(default="", alias="BACKPACK_API_SECRET")
 
+    polymarket_proxy_address: str = Field(default="", alias="POLYMARKET_PROXY_ADDRESS")
+    polymarket_proxy_secret: str = Field(default="", alias="POLYMARKET_PROXY_SECRET")
+
     arcus_address: str = Field(default="", alias="ARCUS_ADDRESS")
     arcus_account_index: int = Field(default=0, alias="ARCUS_ACCOUNT_INDEX")
 

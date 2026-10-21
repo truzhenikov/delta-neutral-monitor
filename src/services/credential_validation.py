@@ -49,7 +49,18 @@ def build_default_credential_validation_service(supported_exchanges: list[str]) 
             message="ED25519 keypair validated locally; live account verification not performed.",
         )
 
+    async def _polymarket(payload: dict[str, str]) -> CredentialValidationResult:
+        from src.connectors.polymarket_connector import validate_credentials
+
+        validate_credentials(payload)
+        return CredentialValidationResult(
+            ok=True, checked=False,
+            message="Proxy credential format validated locally; live account verification not performed.",
+        )
+
     validators = {exchange: _placeholder for exchange in supported_exchanges}
+    if "polymarket" in validators:
+        validators["polymarket"] = _polymarket
     if "backpack" in validators:
         validators["backpack"] = _backpack
     return CredentialValidationService(validators=validators)

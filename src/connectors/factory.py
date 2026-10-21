@@ -5,6 +5,7 @@ from src.connectors.mock_connectors import (
     AdenConnector,
     ArcusConnector,
     BackpackConnector,
+    PolymarketConnector,
     AsterConnector,
     BinanceConnector,
     BingxConnector,
@@ -54,6 +55,7 @@ from src.connectors.woofi_connector import WoofiRealConnector
 from src.connectors.aster_connector import AsterRealConnector
 from src.connectors.arcus_connector import ArcusRealConnector
 from src.connectors.backpack_connector import BackpackRealConnector
+from src.connectors.polymarket_connector import PolymarketRealConnector
 
 MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenConnector,
@@ -80,6 +82,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "woofi": WoofiConnector,
     "arcus": ArcusConnector,
     "backpack": BackpackConnector,
+    "polymarket": PolymarketConnector,
 }
 
 REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
@@ -107,6 +110,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "woofi": WoofiRealConnector,
     "arcus": ArcusRealConnector,
     "backpack": BackpackRealConnector,
+    "polymarket": PolymarketRealConnector,
 }
 
 

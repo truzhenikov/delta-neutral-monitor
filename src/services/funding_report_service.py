@@ -27,6 +27,7 @@ from src.services.mexc_funding import fetch_mexc_funding
 from src.services.woofi_funding import fetch_woofi_funding
 from src.services.okx_funding import fetch_okx_funding
 from src.services.ondo_funding import fetch_ondo_funding
+from src.services.polymarket_funding import fetch_polymarket_funding
 from src.services.variational_funding import fetch_variational_funding
 
 MSK = ZoneInfo("Europe/Moscow")
@@ -84,6 +85,7 @@ class FundingReportService:
         binance_api_base: str = "https://fapi.binance.com",
         bitget_api_base: str = "https://api.bitget.com",
         backpack_api_base: str = "https://api.backpack.exchange",
+        polymarket_api_base: str = "https://api.perpetuals.polymarket.com",
         request_timeout_sec: float = 20.0,
         max_lighter_sample_gap_sec: int = 900,
         request_json: _RequestJson | None = None,
@@ -107,6 +109,7 @@ class FundingReportService:
         self.binance_api_base = binance_api_base
         self.bitget_api_base = bitget_api_base
         self.backpack_api_base = backpack_api_base
+        self.polymarket_api_base = polymarket_api_base
         self.request_timeout_sec = request_timeout_sec
         self.max_lighter_sample_gap_sec = max_lighter_sample_gap_sec
         self._request_json_override = request_json
@@ -310,6 +313,7 @@ class FundingReportService:
             ("binance", "Binance", fetch_binance_funding, self.binance_api_base),
             ("bitget", "Bitget", fetch_bitget_funding, self.bitget_api_base),
             ("backpack", "Backpack", fetch_backpack_funding, self.backpack_api_base),
+            ("polymarket", "Polymarket", fetch_polymarket_funding, self.polymarket_api_base),
         ):
             refs = self._enabled_refs(venue)
             if not refs:

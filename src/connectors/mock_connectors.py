@@ -166,6 +166,14 @@ class BackpackConnector(ExchangeConnector):
         return make_mock_snapshot(self.exchange, price_shift=140)
 
 
+class PolymarketConnector(ExchangeConnector):
+    exchange = "polymarket"
+    label = "Polymarket Perps"
+
+    async def fetch_account_snapshot(self) -> AccountSnapshot:
+        return make_mock_snapshot(self.exchange, price_shift=145)
+
+
 class ArcusConnector(ExchangeConnector):
     exchange = "arcus"
 

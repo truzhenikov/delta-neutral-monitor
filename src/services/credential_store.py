@@ -33,6 +33,7 @@ class CredentialStore:
         "aster": ("user_address", "signer", "signer_private_key"),
         "arcus": ("address", "account_index"),
         "backpack": ("api_key", "api_secret"),
+        "polymarket": ("proxy_address", "proxy_secret"),
     }
     OPTIONAL_EXCHANGE_FIELDS: dict[str, tuple[str, ...]] = {
         # Hyperliquid DEX namespaces (for example xyz, cash, km, flx, io)
