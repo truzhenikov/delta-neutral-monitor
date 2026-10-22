@@ -29,6 +29,8 @@ MONTH_NAMES = {
 
 # Exact refs prevent a newly-added profile from being silently written to a wrong column.
 EXCHANGE_TO_HEADER = {
+    "backpack:monitor": "Backpack",
+    "polymarket:main": "Polymarket",
     "aden:aden-44c3": "Aden",
     "arcus:arcus-44c3": "Arcus",
     "aster:aster-3c3b": "Aster",
