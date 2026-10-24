@@ -1,4 +1,4 @@
-"""Synthetic contract tests, not authenticated live accounting evidence."""
+"""Offline contracts and sanitized live debit/credit replay; no live requests."""
 import asyncio
 from datetime import datetime
 from decimal import Decimal, localcontext
@@ -45,6 +45,58 @@ def service(tmp_path, request, **kwargs):
     return FundingReportService(store, tmp_path / 'funding.json', request_json=request, **kwargs)
 
 
+@pytest.mark.parametrize('funding,rate,ident,timestamp,display', [
+    ('-0.032181', '0.00000625', 3848868085846259, 1792828800025, '-0.03'),
+    ('0.107068', '-0.00002084', 616548028301290, 1792825200027, '+0.11'),
+    # Synthetic aggregate, NOT a reconstructed 24-payment live ledger.
+    ('6.206798', '-0.00002084', 1, 1792825200027, '+6.21'),
+])
+def test_raw_http_cashflow_sign_through_collector_report_and_renderer(
+        tmp_path, monkeypatch, funding, rate, ident, timestamp, display):
+    now = datetime(2026, 10, 24, 12, tzinfo=MSK)
+    start, end = FundingReportService.completed_window(now)
+    lower, upper = int(start.timestamp() * 1000), int(end.timestamp() * 1000)
+    seen = []
+    payment = dict(id=ident, instrument_id=50, size='800.00', funding_rate=rate,
+                   funding_asset='pUSD', funding=funding, timestamp=timestamp)
+
+    def handler(request):
+        seen.append(request)
+        if request.url.path == '/info':
+            assert request.method == 'POST'
+            return httpx.Response(200, json=[dict(
+                time=timestamp, delta=dict(coin='CXMT', usdc='0.703104'))])
+        assert request.method == 'GET'
+        if request.url.path == '/v1/account/credentials':
+            return httpx.Response(200, json=identity())
+        if request.url.path == '/v1/account/funding':
+            assert dict(request.url.params) == dict(
+                start_timestamp=str(lower), end_timestamp=str(upper))
+            return httpx.Response(200, json=page(payment))
+        assert request.url.path == '/v1/info/instruments'
+        return httpx.Response(200, json=[dict(instrument_id=50, display_symbol='CXMT-USD',
+            quote_asset='pUSD', instrument_type='perpetual')])
+
+    client = httpx.AsyncClient
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(reports.httpx, 'AsyncClient', lambda **kwargs: client(transport=transport, **kwargs))
+    s = service(tmp_path, None)
+    s.credential_store.set_exchange_credentials('hyperliquid', dict(user_address='synthetic-address'))
+    report = asyncio.run(s.build_report(now))
+    assert report.complete and not report.warnings
+    assert (report.start, report.end) == (start, end)
+    amounts = {r.exchange: r.amount_usd for r in report.rows}
+    assert amounts == {'Polymarket': Decimal(funding), 'Hyperliquid': Decimal('0.703104')}
+    assert report.total_usd == Decimal(funding) + Decimal('0.703104')
+    text = render_funding_report(report)
+    assert f'Polymarket — CXMT — {display} USD' in text
+    if funding == '6.206798':
+        assert report.total_usd == Decimal('6.909902')
+        assert 'Итого — +6.91 USD' in text
+        assert '-5.50' not in text
+    assert len(seen) == 4
+
+
 def test_contract_ledger_closed_positions_exact_money_and_half_open_window(tmp_path):
     request = AsyncMock(side_effect=[identity(), page(
         row(funding='-123456789012345678901234567890.123456789'),
@@ -54,7 +106,7 @@ def test_contract_ledger_closed_positions_exact_money_and_half_open_window(tmp_p
     with localcontext() as ctx:
         ctx.prec = 3
         report = asyncio.run(service(tmp_path, request).build_report(NOW))
-        assert report.total_usd == Decimal('123456789012345678901234567890.123456788')
+        assert report.total_usd == Decimal('-123456789012345678901234567890.123456788')
     assert report.complete and not report.warnings
     assert (report.start, report.end) == (START, END)
     assert len(report.rows) == 1 and report.rows[0].exchange == 'Polymarket'
@@ -201,7 +253,7 @@ def test_real_http_transport_preserves_large_ids_money_and_blocks_redirects(tmp_
     monkeypatch.setattr(reports.httpx, 'AsyncClient', lambda **kwargs: client(transport=transport, **kwargs))
     report = asyncio.run(service(tmp_path, None).build_report(NOW))
     if status == 200:
-        assert report.complete and report.total_usd == Decimal('2.50') and len(seen) == 3
+        assert report.complete and report.total_usd == Decimal('-2.50') and len(seen) == 3
     else:
         assert not report.complete and not report.rows and len(seen) == 1
         assert CREDS['proxy_secret'] not in render_funding_report(report)

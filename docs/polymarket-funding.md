@@ -9,11 +9,17 @@ Only explicitly enabled `polymarket` profile references are collected. Disabled
 profiles cause no collector call, credential read, public metadata request, or
 credential-store mutation. Adding this code does not enable any profile.
 
-**Verification is source-contract and synthetic-test only. No authenticated live
-account, nonzero payment, account signup, credential issuance, rotation, or runtime
-activation was performed for this work.** Tests use invented accounts and amounts;
-they are not live ledger evidence. A complete empty response means no reported
-payments in the selected window, not proof of nonzero accounting correctness.
+**Sign verification now includes sanitized records supplied from an authenticated
+live read for 23 October 2026 11:30 through 24 October 2026 11:30 MSK.** The
+instrument-50 CXMT long-size-800 records below establish the API's signed-cashflow
+convention. Regression tests replay their exact financial fields offline using
+invented account identities and credentials; they perform no authenticated live
+requests. This fix did not create or rotate credentials or activate profiles.
+The supplied live read reported 24 payments with complete (`more: false`)
+responses, totaling +6.206798 Polymarket funding; Hyperliquid signed funding was
++0.703104, giving +6.909902 combined. The aggregate regression is explicitly a
+synthetic aggregate, not a reconstruction of all 24 unavailable raw records.
+This is live API evidence, **not independent UI/balance-change reconciliation**.
 
 ## Authoritative sources inspected
 
@@ -99,19 +105,28 @@ remaining deadline/budget. Failure is not turned into a zero or partial result.
 
 Payment IDs remain Python integers (no float/JavaScript-safe-integer conversion).
 Financial fields must be finite plain decimal strings. Exact coefficient-based
-addition and sign negation are independent of the caller's Decimal context,
+addition and unchanged source signs are independent of the caller's Decimal context,
 including amounts larger than the default 28-digit precision. No rounding is
 performed before display.
 
 ## Sign, timezone and pUSD: resolved contract versus remaining limitations
 
-- **Sign contract:** OpenAPI `fund` says **“Funding paid in USD”**. The positive
-  long-size/positive-rate/positive-funding examples agree with the funding guide's
-  long-pays rule. The collector therefore negates `funding` to produce this
-  application's **received-positive / paid-negative** convention. The SDK parses
-  the field without changing its sign. This is documented-contract evidence,
-  not an independently reconciled live debit/credit. No rate-based reconstruction
-  or absolute-value conversion is used.
+- **Sign contract:** `funding` is already **received-positive / paid-negative**
+  signed account cashflow. Preserve it unchanged; do not negate it or infer its
+  sign from size/rate. OpenAPI `fund`'s **“Funding paid in USD”** wording was
+  previously misread as paid-positive. Sanitized live records contradict that
+  interpretation and agree with the funding guide's positive-rate/long-pays rule:
+
+  | Payment ID | Instrument | Size | Rate | Raw funding (pUSD) | Timestamp (ms) |
+  | --- | --- | --- | --- | --- | --- |
+  | 3848868085846259 | 50 | 800.00 | 0.00000625 | -0.032181 | 1792828800025 |
+  | 616548028301290 | 50 | 800.00 | -0.00002084 | 0.107068 | 1792825200027 |
+
+  The first long pays (negative cashflow); the second long receives (positive).
+  The old negation produced -5.503694 for the supplied pair totals; unchanged
+  signed amounts correctly give +6.909902. No rate-based reconstruction or
+  absolute-value conversion is used. These records are API evidence, not
+  independent proof of corresponding UI or balance changes.
 - **Timezone contract:** Unix milliseconds remove the naive-timezone ambiguity.
   SDK UTC datetime conversion supports this interpretation. Live payment timing
   versus independently timestamped balance changes has not been reconciled.
@@ -124,14 +139,12 @@ performed before display.
   their actual REST semantics are verified and tested. Never silently relabel
   unknown settlement assets as USD.
 
-Remaining uncertainty is authenticated live conformance, retention behavior,
-API access/eligibility, and nonzero reconciliation—not permission to invent data.
-Before production reliance, an authorized isolated read must reconcile canonical
-identity, debit and credit examples, exact timestamps, amount units, and a
-multi-page window against independent account evidence. If the API contradicts
-any financial contract above, keep the profile disabled and change the collector
-only after resolving that contradiction. An empty live window cannot settle any
-of these nonzero-accounting questions.
+Remaining uncertainty includes independent balance/UI reconciliation, retention
+behavior, API access/eligibility across accounts, and live multi-page conformance.
+The supplied nonzero debit/credit records resolve the mistaken sign interpretation;
+they do not independently validate all identity, timing, unit or pagination
+contracts. Authorized follow-up should reconcile those against independent account
+evidence. An empty live window cannot settle nonzero-accounting questions.
 
 ## Presentation and all-or-nothing integration
 
@@ -151,7 +164,10 @@ The automatic sender must continue to respect the existing complete-report gate.
 ## Tests
 
 Run `pytest tests/test_polymarket_funding.py tests/test_polymarket_funding_integration.py -q`.
-Coverage includes exact large decimals under reduced precision; inclusive query
+Coverage includes exact sanitized live debit/credit replay through raw HTTP JSON,
+collector, report and renderer; synthetic aggregate reconciliation of +6.206798
+Polymarket plus +0.703104 Hyperliquid to +6.909902; exact large decimals under
+reduced precision; inclusive query
 and exclusive report boundaries; account-wide closed/unknown markets; split
 pagination and saturation; complete empty histories; request and time budgets;
 full preflight; same-account proxy deduplication and conflicts; identity failures;

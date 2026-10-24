@@ -1,4 +1,4 @@
-"""Synthetic official-schema fixtures, never authenticated live evidence."""
+"""Synthetic contracts plus sanitized live financial records; no live requests."""
 import asyncio
 import importlib.util
 import json
@@ -46,6 +46,25 @@ def run(request, profiles=None, start=START, end=END, base=BASE):
     return asyncio.run(fetch_polymarket_funding(store, list(profiles), start, end, request, base))
 
 
+@pytest.mark.parametrize('payment', [
+    {'id': 3848868085846259, 'instrument_id': 50, 'size': '800.00',
+     'funding_rate': '0.00000625', 'funding_asset': 'pUSD',
+     'funding': '-0.032181', 'timestamp': 1792828800025},
+    {'id': 616548028301290, 'instrument_id': 50, 'size': '800.00',
+     'funding_rate': '-0.00002084', 'funding_asset': 'pUSD',
+     'funding': '0.107068', 'timestamp': 1792825200027},
+])
+def test_live_evidence_raw_json_preserves_received_positive_cashflow(payment):
+    # Sanitized financial fields supplied from an authenticated read; no live IO.
+    start = datetime(2026, 10, 23, 11, 30, tzinfo=START.tzinfo)
+    end = start + timedelta(days=1)
+    ledger = json.loads(json.dumps(page(payment)))
+    request = AsyncMock(side_effect=[identity(), ledger, []])
+    with localcontext() as ctx:
+        ctx.prec = 3
+        assert run(request, start=start, end=end) == {'50': Decimal(payment['funding'])}
+
+
 def test_raw_json_boundary_sign_large_ids_exact_under_small_context():
     ledger = json.loads(json.dumps(page(
         row(funding='123456789012345678901234567890.123456789', id=9007199254740993123456789),
@@ -56,7 +75,7 @@ def test_raw_json_boundary_sign_large_ids_exact_under_small_context():
     request = AsyncMock(side_effect=[identity(), ledger, []])
     with localcontext() as ctx:
         ctx.prec = 3
-        assert run(request) == {'1': Decimal('-123456789012345678901234567890.123456788')}
+        assert run(request) == {'1': Decimal('123456789012345678901234567890.123456788')}
     private = request.call_args_list[:2]
     assert urlsplit(private[0].args[1]).path == '/v1/account/credentials'
     funding_call = private[1]
@@ -77,7 +96,7 @@ def test_more_splits_inclusive_intervals_discards_capped_parent():
                                     page(row(timestamp=midpoint, funding='2')),
                                     page(row(id=2, timestamp=midpoint + 1, funding='-3')), []])
     # The capped parent repeats a real event; it must not also be added to leaves.
-    assert run(request) == {'1': Decimal('1')}
+    assert run(request) == {'1': Decimal('-1')}
     queries = [parse_qs(urlsplit(c.args[1]).query) for c in request.call_args_list[1:4]]
     assert queries == [
         {'start_timestamp': [str(LOWER)], 'end_timestamp': [str(UPPER)]},
@@ -95,7 +114,7 @@ def test_closed_and_unknown_instruments_not_filtered_by_current_metadata():
     with pytest.raises(ValueError):
         run(request)
     request = AsyncMock(side_effect=[identity(), page(row(), row(id=2, instrument_id=987)), metadata])
-    assert run(request) == {'USA500': Decimal('-1'), '987': Decimal('-1')}
+    assert run(request) == {'USA500': Decimal('1'), '987': Decimal('1')}
     assert request.call_args_list[-1].kwargs['headers'] == {}
 
 
@@ -104,13 +123,13 @@ def test_closed_and_unknown_instruments_not_filtered_by_current_metadata():
     [{'instrument_id': True, 'display_symbol': 'BTC-USD'}]])
 def test_optional_metadata_failure_or_unsafe_label_falls_back(metadata):
     request = AsyncMock(side_effect=[identity(), page(row()), metadata])
-    assert run(request) == {'1': Decimal('-1')}
+    assert run(request) == {'1': Decimal('1')}
 
 
 def test_metadata_only_once_across_profiles_and_never_private_headers():
     request = AsyncMock(side_effect=[identity(), page(row()), identity('0x' + '2' * 40),
                                     page(row()), []])
-    assert run(request, {'polymarket:a': CREDS, 'polymarket:b': SECOND}) == {'1': Decimal('-2')}
+    assert run(request, {'polymarket:a': CREDS, 'polymarket:b': SECOND}) == {'1': Decimal('2')}
     public = [c for c in request.call_args_list if '/info/' in c.args[1]]
     assert len(public) == 1
     assert public[0].kwargs['headers'] == {}
@@ -120,7 +139,7 @@ def test_multiple_keys_same_account_dedup_and_distinct_markets_same_id_survive()
     request = AsyncMock(side_effect=[identity(), page(row()), identity(),
                                     page(row(), row(instrument_id=2)), []])
     assert run(request, {'polymarket:a': CREDS, 'polymarket:b': SECOND}) == {
-        '1': Decimal('-1'), '2': Decimal('-1')}
+        '1': Decimal('1'), '2': Decimal('1')}
 
 
 @pytest.mark.parametrize('change', [{'funding': '2'}, {'funding_rate': '0.2'}, {'size': '-3'},
@@ -134,7 +153,7 @@ def test_same_account_same_market_same_id_conflict_fails(change):
 def test_exact_proxy_aliases_fetched_once_case_insensitive_identity():
     request = AsyncMock(side_effect=[identity(), page(row()), []])
     alias = dict(CREDS, proxy_address='0x' + 'A' * 40)
-    assert run(request, {'polymarket:a': CREDS, 'polymarket:alias': alias}) == {'1': Decimal('-1')}
+    assert run(request, {'polymarket:a': CREDS, 'polymarket:alias': alias}) == {'1': Decimal('1')}
     assert request.await_count == 3
 
 
@@ -305,7 +324,7 @@ def test_metadata_budget_exhaustion_is_optional_and_exact_amount_survives(monkey
     import src.services.polymarket_funding as funding
     monkeypatch.setattr(funding, 'MAX_REQUESTS', 2)
     request = AsyncMock(side_effect=[identity(), page(row())])
-    assert run(request) == {'1': Decimal('-1')}
+    assert run(request) == {'1': Decimal('1')}
     assert request.await_count == 2
 
 

@@ -224,10 +224,9 @@ async def fetch_polymarket_funding(
                             continue
                         seen[key] = fingerprint
                         if lower <= event < upper:
-                            # OpenAPI fund = "Funding paid in USD"; negate the
-                            # paid-positive ledger to our received-positive report.
-                            # See the funding guide's positive-rate/long pays table.
-                            totals[market] = _add(totals.get(market, Decimal(0)), amount.copy_negate())
+                            # Live debit/credit records are already received-positive
+                            # signed cashflow, despite OpenAPI's ambiguous "paid".
+                            totals[market] = _add(totals.get(market, Decimal(0)), amount)
                 if not observed.keys() <= complete:
                     raise ValueError('Polymarket funding pagination missing observed events')
     except TimeoutError:
