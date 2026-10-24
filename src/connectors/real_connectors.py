@@ -1074,6 +1074,41 @@ class PacificaRealConnector(_BaseRealConnector):
         )
 
 
+def _hyperliquid_portfolio_available_usdc(spot_state: dict[str, Any]) -> float:
+    """Native USDC availability, not a withdrawal/transfer authorization.
+
+    Do not reconstruct this from total - hold or supplied: portfolio loans and
+    maintenance constraints are already accounted for by the venue's field.
+    Missing availability is unknown; the common model cannot represent None.
+    """
+    error = "hyperliquid portfolio margin available balance is missing or invalid"
+    rows = spot_state.get("tokenToAvailableAfterMaintenance")
+    if not isinstance(rows, list):
+        raise RealConnectorRequestError(error)
+    amounts: dict[int, Decimal] = {}
+    for row in rows:
+        if not isinstance(row, (list, tuple)) or len(row) != 2:
+            raise RealConnectorRequestError(error)
+        token, raw_amount = row
+        if type(token) is not int or token < 0 or token in amounts:
+            raise RealConnectorRequestError(error)
+        if not isinstance(raw_amount, (str, int, float)) or isinstance(raw_amount, bool):
+            raise RealConnectorRequestError(error)
+        try:
+            amount = Decimal(str(raw_amount))
+        except (InvalidOperation, ValueError):
+            raise RealConnectorRequestError(error) from None
+        # The snapshot uses floats; also reject finite Decimals overflowing it.
+        if not amount.is_finite() or amount.copy_abs() > Decimal("1.7976931348623157e308"):
+            raise RealConnectorRequestError(error)
+        amounts[token] = amount
+    if 0 not in amounts:
+        raise RealConnectorRequestError(error)
+    # Token 0 is canonical USDC. Other collateral is not valued at one dollar,
+    # nor are independent per-token borrow capacities summed together.
+    return float(max(amounts[0], Decimal(0)))
+
+
 class HyperliquidRealConnector(_BaseRealConnector):
     exchange = "hyperliquid"
 
@@ -1198,6 +1233,9 @@ class HyperliquidRealConnector(_BaseRealConnector):
 
         spot_portfolio_value = _hyperliquid_spot_portfolio_value(spot_state, spot_meta, all_mids)
         equity = spot_portfolio_value if spot_portfolio_value > 0 else perps_equity
+        if spot_state.get("portfolioMarginEnabled") is True:
+            # Spot is the unified source: replace, never add per-DEX balances.
+            available = _hyperliquid_portfolio_available_usdc(spot_state)
 
         return AccountSnapshot(
             exchange=self.exchange,
