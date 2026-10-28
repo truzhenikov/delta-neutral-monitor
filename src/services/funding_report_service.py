@@ -28,6 +28,7 @@ from src.services.woofi_funding import fetch_woofi_funding
 from src.services.okx_funding import fetch_okx_funding
 from src.services.ondo_funding import fetch_ondo_funding
 from src.services.polymarket_funding import fetch_polymarket_funding
+from src.services.risex_funding import fetch_risex_funding
 from src.services.variational_funding import fetch_variational_funding
 
 MSK = ZoneInfo("Europe/Moscow")
@@ -86,6 +87,7 @@ class FundingReportService:
         bitget_api_base: str = "https://api.bitget.com",
         backpack_api_base: str = "https://api.backpack.exchange",
         polymarket_api_base: str = "https://api.perpetuals.polymarket.com",
+        risex_api_base: str = "https://api.rise.trade",
         request_timeout_sec: float = 20.0,
         max_lighter_sample_gap_sec: int = 900,
         request_json: _RequestJson | None = None,
@@ -110,6 +112,7 @@ class FundingReportService:
         self.bitget_api_base = bitget_api_base
         self.backpack_api_base = backpack_api_base
         self.polymarket_api_base = polymarket_api_base
+        self.risex_api_base = risex_api_base
         self.request_timeout_sec = request_timeout_sec
         self.max_lighter_sample_gap_sec = max_lighter_sample_gap_sec
         self._request_json_override = request_json
@@ -314,6 +317,7 @@ class FundingReportService:
             ("bitget", "Bitget", fetch_bitget_funding, self.bitget_api_base),
             ("backpack", "Backpack", fetch_backpack_funding, self.backpack_api_base),
             ("polymarket", "Polymarket", fetch_polymarket_funding, self.polymarket_api_base),
+            ("risex", "RiseX", fetch_risex_funding, self.risex_api_base),
         ):
             refs = self._enabled_refs(venue)
             if not refs:
@@ -324,6 +328,11 @@ class FundingReportService:
                     partial(self._request_json, decimal_json=True), api_base,
                 )
                 rows.extend(FundingRow(label, symbol, amount) for symbol, amount in totals.items())
+                if venue == "risex" and totals:
+                    warnings.append(
+                        "RiseX — включает unsettled-начисления; settled учтены по времени settlement, "
+                        "точная суточная атрибуция не подтверждена."
+                    )
             except Exception as exc:
                 warnings.append(f"{label} — не удалось получить полную историю: {type(exc).__name__}.")
         for venue, label, api_base in (
