@@ -8,7 +8,7 @@ The value replaces, rather than adds to, the sum of per-DEX `clearinghouseState.
 
 An absent field, absent USDC tuple, malformed amount, non-finite/unrepresentable amount, malformed token ID, or duplicate token ID causes `RealConnectorRequestError`. An empty array is **unknown**, not a certified zero. A valid explicit zero is zero; finite negative availability is conservatively clamped to zero. The common snapshot model has no unknown-value or provenance field, so the connector fails instead of publishing a fabricated successful zero. Errors are sanitized and do not contain account identifiers or raw payloads.
 
-Accounts without the explicit true portfolio-margin flag retain the existing ordinary-account mapping. No account mode, profile enablement, credentials, position mode, orders, margin, or transfers are changed. This patch adds no network requests.
+Accounts without the explicit true portfolio-margin flag retain the existing ordinary-account mapping. No account mode, profile enablement, credentials, position mode, orders, margin, or transfers are changed. The availability mapping itself adds no network requests; [account-wide HIP-3 namespace discovery](hyperliquid-dex-discovery.md) separately expands the DEX read scope without changing these field semantics.
 
 Equity mapping is unchanged: the existing spot portfolio valuation takes precedence when positive; perps account values are not added to that unified balance. `supplied` is not added to `total`, and neither supplied nor perps equity is added to available balance. This narrowly scoped fix does not claim to solve pre-existing general multi-collateral/debt/equity valuation limitations.
 

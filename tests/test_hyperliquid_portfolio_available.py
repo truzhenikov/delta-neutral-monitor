@@ -34,10 +34,13 @@ def snapshot(monkeypatch, spot, *, exchange="hyperliquid:fixture", withdrawable=
     async def post(*, base_url, path, body, headers):
         calls.append(deepcopy(body))
         kind = body["type"]
+        if kind == "perpDexs":
+            assert body == {"type": "perpDexs"}
+            return [None, {"name": "xyz"}, {"name": "io"}]
         if kind == "clearinghouseState":
             return {"marginSummary": {"accountValue": "3754.011463" if body.get("dex") == "xyz" else "0"},
                     "crossMarginSummary": {"accountValue": "0"},
-                    "crossMaintenanceMarginUsed": "0", "withdrawable": withdrawable,
+                    "crossMaintenanceMarginUsed": "0", "withdrawable": withdrawable if body.get("dex") else "0",
                     "assetPositions": [{"position": {
                         "coin": "xyz:TEST", "szi": "1", "entryPx": "100", "markPx": "101",
                         "liquidationPx": "50", "leverage": {"type": "isolated", "value": 3}}}]
@@ -54,7 +57,8 @@ def snapshot(monkeypatch, spot, *, exchange="hyperliquid:fixture", withdrawable=
 
     connector._post = post
     result = asyncio.run(connector.fetch_account_snapshot())
-    assert all(call["type"] in {"clearinghouseState", "metaAndAssetCtxs", "spotClearinghouseState", "spotMeta", "allMids"} for call in calls)
+    assert calls[0] == {"type": "perpDexs"}
+    assert all(call["type"] in {"perpDexs", "clearinghouseState", "metaAndAssetCtxs", "spotClearinghouseState", "spotMeta", "allMids"} for call in calls)
     return result
 
 

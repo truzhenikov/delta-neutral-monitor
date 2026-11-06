@@ -50,7 +50,7 @@ The monitor currently supports **25 exchange integrations** for futures/perpetua
 
 Exchange names used in `ENABLED_EXCHANGES` and the Telegram setup flow are the lowercase identifiers: `binance`, `bitget`, `bingx`, `phemex`, `mexc`, `gate`, `pacifica`, `okx`, `kucoin`, `aden`, `vest`, `lighter`, `lighter-rh`, `nado`, `hyperliquid`, `txflow`, `ondo`, `risex`, `variational`, `extended`, `woofi`, `aster`, `arcus`, `backpack`, `polymarket`.
 
-Hyperliquid DEX namespaces are configured separately with `HYPERLIQUID_DEX`. The IO provider is supported as `io`; multiple namespaces can be listed comma-separated, for example `xyz,cash,km,flx,io`. The same `dex` value can be stored in a profiled Hyperliquid credential entry.
+Hyperliquid automatically discovers registered HIP-3 DEX namespaces using the public read-only `perpDexs` Info query on every snapshot, and always includes the native perp DEX. `HYPERLIQUID_DEX` (or a profile's nonempty `dex`, which takes precedence) supplies optional comma-separated **additional** namespaces, not an allowlist; names are queried once even when repeated in configuration/discovery. No manual update is required for newly registered namespaces such as `para`. Discovery or any required DEX read failure fails the entire live account snapshot rather than publishing partial positions. See [HIP-3 discovery and timeout behavior](docs/hyperliquid-dex-discovery.md).
 
 ## No demo mode
 

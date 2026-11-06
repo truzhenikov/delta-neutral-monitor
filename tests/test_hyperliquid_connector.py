@@ -15,7 +15,25 @@ class StubHyperliquidConnector(HyperliquidRealConnector):
     async def _post(self, base_url: str, path: str, body: dict, headers=None) -> object:
         assert path == "/info"
         assert headers == {"Content-Type": "application/json"}
-        return self._responses.pop(0)
+        if body["type"] == "perpDexs":
+            from src.config import get_settings
+
+            assert body == {"type": "perpDexs"}
+            dexes = [part.strip() for part in get_settings().hyperliquid_dex.split(",") if part.strip()] or [""]
+            self._payloads = {}
+            for dex in dexes:
+                self._payloads[("clearinghouseState", dex)] = self._responses.pop(0)
+                self._payloads[("metaAndAssetCtxs", dex)] = self._responses.pop(0)
+            for kind in ("spotClearinghouseState", "spotMeta", "allMids"):
+                self._payloads[(kind, "")] = self._responses.pop(0)
+            if "" not in dexes:
+                self._payloads[("clearinghouseState", "")] = {
+                    "marginSummary": {"accountValue": "0"}, "assetPositions": [], "withdrawable": "0"}
+            assert not self._responses
+            # Explicit native-only registry; automatic HIP-3 discovery is covered
+            # separately with a registry containing xyz and previously unconfigured para.
+            return [None]
+        return self._payloads[(body["type"], body.get("dex", ""))]
 
 
 def test_build_connectors_includes_hyperliquid_real() -> None:
@@ -349,7 +367,8 @@ def test_hyperliquid_io_dex_namespace_is_sent_to_info_requests(monkeypatch) -> N
 
     connector = StubHyperliquidConnector()
     connector._responses = [
-        {"marginSummary": {"accountValue": "100"}, "assetPositions": []},
+        {"marginSummary": {"accountValue": "100"}, "assetPositions": [
+            {"position": {"coin": "io:TEST", "szi": "1", "markPx": "100"}}]},
         [{"universe": []}, []],
         {"balances": [], "tokenToAvailableAfterMaintenance": []},
         {"universe": [], "tokens": []},
@@ -365,6 +384,7 @@ def test_hyperliquid_io_dex_namespace_is_sent_to_info_requests(monkeypatch) -> N
     connector._post = capture_post
     asyncio.run(connector.fetch_account_snapshot())
 
-    assert captured_bodies[0] == {"type": "clearinghouseState", "user": "0xuser", "dex": "io"}
-    assert captured_bodies[1] == {"type": "metaAndAssetCtxs", "dex": "io"}
+    assert captured_bodies[0] == {"type": "perpDexs"}
+    assert {"type": "clearinghouseState", "user": "0xuser", "dex": "io"} in captured_bodies
+    assert {"type": "metaAndAssetCtxs", "dex": "io"} in captured_bodies
     get_settings.cache_clear()

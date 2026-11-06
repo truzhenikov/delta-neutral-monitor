@@ -48,11 +48,14 @@ def test_hyperliquid_funding_is_aggregated_by_exchange_and_coin(tmp_path: Path) 
         assert method == "POST"
         assert url.endswith("/info")
         assert kwargs["json"]["type"] == "userFunding"
+        assert "dex" not in kwargs["json"]  # account-wide ledger, not a configured namespace loop
         start_ms = kwargs["json"]["startTime"]
         return [
             {"time": start_ms + 1, "delta": {"coin": "io:NBIS", "usdc": "1.25"}},
             {"time": start_ms + 2, "delta": {"coin": "io:NBIS", "usdc": "-0.20"}},
             {"time": start_ms + 3, "delta": {"coin": "xyz:PLATINUM", "usdc": "2.00"}},
+            {"time": start_ms + 4, "delta": {"coin": "xyz:UNITREE", "usdc": "-0.41"}},
+            {"time": start_ms + 4, "delta": {"coin": "para:UNITREE", "usdc": "-0.10"}},
         ]
 
     service = FundingReportService(
@@ -65,6 +68,7 @@ def test_hyperliquid_funding_is_aggregated_by_exchange_and_coin(tmp_path: Path) 
     values = {(row.exchange, row.symbol): row.amount_usd for row in report.rows}
     assert values[("Hyperliquid", "NBIS")] == Decimal("1.05")
     assert values[("Hyperliquid", "PLATINUM")] == Decimal("2.00")
+    assert values[("Hyperliquid", "UNITREE")] == Decimal("-0.51")
     assert any("Lighter" in warning and "полный период" in warning for warning in report.warnings)
 
 

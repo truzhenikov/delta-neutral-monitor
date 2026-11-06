@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import collections
 import hashlib
@@ -1109,6 +1110,19 @@ def _hyperliquid_portfolio_available_usdc(spot_state: dict[str, Any]) -> float:
     return float(max(amounts[0], Decimal(0)))
 
 
+def _hyperliquid_dex_names(payload: Any, configured: str) -> list[str]:
+    """Native + explicit extras + registered HIP-3 DEXs; config is not an allowlist."""
+    if not isinstance(payload, list) or not payload or payload[0] is not None:
+        raise RealConnectorRequestError("hyperliquid invalid perpDexs response")
+    names = [""] + [part.strip() for part in configured.split(",") if part.strip()]
+    for row in payload[1:]:
+        name = row.get("name") if isinstance(row, dict) else None
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise RealConnectorRequestError("hyperliquid invalid perpDexs namespace")
+        names.append(name)
+    return list(dict.fromkeys(names))
+
+
 class HyperliquidRealConnector(_BaseRealConnector):
     exchange = "hyperliquid"
 
@@ -1117,39 +1131,68 @@ class HyperliquidRealConnector(_BaseRealConnector):
         credentials = _runtime_credentials(self.exchange)
         user = (credentials.get("user_address") or settings.hyperliquid_user_address).strip()
         dex_raw = credentials.get("dex") or settings.hyperliquid_dex
-        dexes = [part.strip() for part in dex_raw.split(",") if part.strip()]
-        if not dexes:
-            dexes = [""]
         if not user:
             raise RealConnectorNotConfiguredError(
                 "hyperliquid user address is not configured (HYPERLIQUID_USER_ADDRESS)"
             )
+
+        # One fresh registry read per snapshot prevents new HIP-3 namespaces from
+        # silently falling outside a stale profile/environment list.
+        semaphore = asyncio.Semaphore(4)
+
+        async def info(body: dict[str, Any]) -> Any:
+            async with semaphore:
+                return await self._post(
+                    base_url=settings.hyperliquid_api_base, path="/info", body=body,
+                    headers={"Content-Type": "application/json"},
+                )
+
+        dexes = _hyperliquid_dex_names(await info({"type": "perpDexs"}), dex_raw)
+
+        async def dex_payloads(dex: str) -> tuple[dict, list]:
+            scope = {"dex": dex} if dex else {}
+            state = await info({"type": "clearinghouseState", "user": user, **scope})
+            if (not isinstance(state, dict)
+                    or not isinstance(state.get("assetPositions"), list)
+                    or not isinstance(state.get("marginSummary"), dict)
+                    or "accountValue" not in state["marginSummary"]):
+                raise RealConnectorRequestError("hyperliquid invalid clearinghouseState response")
+            # No prices are needed for a flat DEX, but its balances still count.
+            meta_ctx = [{"universe": []}, []]
+            if state["assetPositions"]:
+                meta_ctx = await info({"type": "metaAndAssetCtxs", **scope})
+                if (not isinstance(meta_ctx, list) or len(meta_ctx) != 2
+                        or not isinstance(meta_ctx[0], dict)
+                        or not isinstance(meta_ctx[0].get("universe"), list)
+                        or not isinstance(meta_ctx[1], list)
+                        or len(meta_ctx[0]["universe"]) != len(meta_ctx[1])):
+                    raise RealConnectorRequestError("hyperliquid invalid metaAndAssetCtxs response")
+            return state, meta_ctx
+
+        # Bound *all* in-flight reads, including spot, rather than serializing
+        # 2N+3 requests under the collector's existing 30-second deadline.
+        tasks: list[asyncio.Task[Any]] = [asyncio.create_task(dex_payloads(dex)) for dex in dexes]
+        tasks.extend(asyncio.create_task(info(body)) for body in (
+            {"type": "spotClearinghouseState", "user": user},
+            {"type": "spotMeta"}, {"type": "allMids"},
+        ))
+        try:
+            results = await asyncio.gather(*tasks)
+        finally:
+            # gather does not cancel siblings on error. Do not leak reads on a
+            # failed DEX or when MonitoringService cancels the entire snapshot.
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        spot_state, spot_meta, all_mids = results[-3:]
 
         positions: list[Position] = []
         perps_equity = 0.0
         available = 0.0
         maintenance_margin = 0.0
 
-        for dex in dexes:
-            state_body = {"type": "clearinghouseState", "user": user}
-            if dex:
-                state_body["dex"] = dex
-
-            state_payload = await self._post(
-                base_url=settings.hyperliquid_api_base,
-                path="/info",
-                body=state_body,
-                headers={"Content-Type": "application/json"},
-            )
-            meta_body = {"type": "metaAndAssetCtxs"}
-            if dex:
-                meta_body["dex"] = dex
-            meta_ctx_payload = await self._post(
-                base_url=settings.hyperliquid_api_base,
-                path="/info",
-                body=meta_body,
-                headers={"Content-Type": "application/json"},
-            )
+        for state_payload, meta_ctx_payload in results[:-3]:
 
             universe = []
             ctxs = []
@@ -1211,25 +1254,6 @@ class HyperliquidRealConnector(_BaseRealConnector):
                 available += _safe_float(state_payload.get("withdrawable"))
             else:
                 available += max(dex_equity - dex_maintenance_margin, 0.0)
-
-        spot_state = await self._post(
-            base_url=settings.hyperliquid_api_base,
-            path="/info",
-            body={"type": "spotClearinghouseState", "user": user},
-            headers={"Content-Type": "application/json"},
-        )
-        spot_meta = await self._post(
-            base_url=settings.hyperliquid_api_base,
-            path="/info",
-            body={"type": "spotMeta"},
-            headers={"Content-Type": "application/json"},
-        )
-        all_mids = await self._post(
-            base_url=settings.hyperliquid_api_base,
-            path="/info",
-            body={"type": "allMids"},
-            headers={"Content-Type": "application/json"},
-        )
 
         spot_portfolio_value = _hyperliquid_spot_portfolio_value(spot_state, spot_meta, all_mids)
         equity = spot_portfolio_value if spot_portfolio_value > 0 else perps_equity
