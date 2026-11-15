@@ -20,7 +20,7 @@ For every configured venue it normalizes account state into a common shape and c
 
 ### Supported integrations
 
-The monitor currently supports **25 exchange integrations** for futures/perpetual account monitoring:
+The monitor currently supports **26 exchange integrations** for futures/perpetual account monitoring:
 
 - Binance Futures
 - Bitget
@@ -47,8 +47,9 @@ The monitor currently supports **25 exchange integrations** for futures/perpetua
 - Arcus
 - Polymarket Perps (`polymarket`; [read-only connector and limitations](docs/polymarket-perps.md); opt-in only, not binary prediction markets)
 - Backpack ([read-only connector and limitations](docs/backpack.md); [historical funding ledger](docs/backpack-funding.md), activation remains opt-in)
+- QFEX (`qfex`; [read-only cross-margin connector and verification limits](docs/qfex.md); disabled by default, historical funding not integrated)
 
-Exchange names used in `ENABLED_EXCHANGES` and the Telegram setup flow are the lowercase identifiers: `binance`, `bitget`, `bingx`, `phemex`, `mexc`, `gate`, `pacifica`, `okx`, `kucoin`, `aden`, `vest`, `lighter`, `lighter-rh`, `nado`, `hyperliquid`, `txflow`, `ondo`, `risex`, `variational`, `extended`, `woofi`, `aster`, `arcus`, `backpack`, `polymarket`.
+Exchange names used in `ENABLED_EXCHANGES` and the Telegram setup flow are the lowercase identifiers: `binance`, `bitget`, `bingx`, `phemex`, `mexc`, `gate`, `pacifica`, `okx`, `kucoin`, `aden`, `vest`, `lighter`, `lighter-rh`, `nado`, `hyperliquid`, `txflow`, `ondo`, `risex`, `variational`, `extended`, `woofi`, `aster`, `arcus`, `backpack`, `polymarket`, `qfex`.
 
 Hyperliquid automatically discovers registered HIP-3 DEX namespaces using the public read-only `perpDexs` Info query on every snapshot, and always includes the native perp DEX. `HYPERLIQUID_DEX` (or a profile's nonempty `dex`, which takes precedence) supplies optional comma-separated **additional** namespaces, not an allowlist; names are queried once even when repeated in configuration/discovery. No manual update is required for newly registered namespaces such as `para`. Discovery or any required DEX read failure fails the entire live account snapshot rather than publishing partial positions. See [HIP-3 discovery and timeout behavior](docs/hyperliquid-dex-discovery.md).
 

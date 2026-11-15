@@ -40,6 +40,10 @@ class RiskEngine:
         min_liq_dist = min((dist for dist, _ in liq_distances), default=None)
 
         warnings: list[str] = []
+        unknown_qfex = sorted({p.exchange for p in positions
+                               if p.exchange.split(":", 1)[0] == "qfex" and p.liquidation_price is None})
+        for exchange in unknown_qfex:
+            warnings.append(f"{exchange}: liquidation distance unavailable; native maintenance only (cross margin)")
         if margin_ratio >= self.max_margin_ratio:
             warnings.append(
                 f"Margin ratio {margin_ratio:.2f} >= threshold {self.max_margin_ratio:.2f}"

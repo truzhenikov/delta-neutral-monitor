@@ -58,7 +58,20 @@ def build_default_credential_validation_service(supported_exchanges: list[str]) 
             message="Proxy credential format validated locally; live account verification not performed.",
         )
 
-    validators = {exchange: _placeholder for exchange in supported_exchanges}
+    async def _qfex(payload: dict[str, str]) -> CredentialValidationResult:
+        from src.connectors.qfex_connector import validate_credentials
+
+        validate_credentials(payload)
+        return CredentialValidationResult(
+            ok=True, checked=False,
+            message="QFEX credential format validated locally; live account verification not performed.",
+        )
+
+    validators: dict[str, Callable[[dict[str, str]], Awaitable[CredentialValidationResult]]] = {
+        exchange: _placeholder for exchange in supported_exchanges
+    }
+    if "qfex" in validators:
+        validators["qfex"] = _qfex
     if "polymarket" in validators:
         validators["polymarket"] = _polymarket
     if "backpack" in validators:

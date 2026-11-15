@@ -6,6 +6,7 @@ from src.connectors.mock_connectors import (
     ArcusConnector,
     BackpackConnector,
     PolymarketConnector,
+    QfexConnector,
     AsterConnector,
     BinanceConnector,
     BingxConnector,
@@ -56,6 +57,7 @@ from src.connectors.aster_connector import AsterRealConnector
 from src.connectors.arcus_connector import ArcusRealConnector
 from src.connectors.backpack_connector import BackpackRealConnector
 from src.connectors.polymarket_connector import PolymarketRealConnector
+from src.connectors.qfex_connector import QfexRealConnector
 
 MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "aden": AdenConnector,
@@ -83,6 +85,7 @@ MOCK_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "arcus": ArcusConnector,
     "backpack": BackpackConnector,
     "polymarket": PolymarketConnector,
+    "qfex": QfexConnector,
 }
 
 REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
@@ -111,6 +114,7 @@ REAL_CONNECTOR_MAP: dict[str, type[ExchangeConnector]] = {
     "arcus": ArcusRealConnector,
     "backpack": BackpackRealConnector,
     "polymarket": PolymarketRealConnector,
+    "qfex": QfexRealConnector,
 }
 
 

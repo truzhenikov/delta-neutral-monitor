@@ -145,6 +145,10 @@ class Settings(BaseSettings):
     backpack_api_key: str = Field(default="", alias="BACKPACK_API_KEY")
     backpack_api_secret: str = Field(default="", alias="BACKPACK_API_SECRET")
 
+    qfex_api_key: str = Field(default="", alias="QFEX_API_KEY")
+    qfex_api_secret: str = Field(default="", alias="QFEX_API_SECRET")
+    qfex_account_id: str = Field(default="", alias="QFEX_ACCOUNT_ID")
+
     polymarket_proxy_address: str = Field(default="", alias="POLYMARKET_PROXY_ADDRESS")
     polymarket_proxy_secret: str = Field(default="", alias="POLYMARKET_PROXY_SECRET")
 

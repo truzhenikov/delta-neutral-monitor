@@ -11,6 +11,9 @@ from src.services.telegram_preferences import TelegramPreferencesService
 
 
 FIELD_LABELS: dict[tuple[str, str], str] = {
+    ("qfex", "api_key"): "QFEX PUBLIC API key (view-only permissions)",
+    ("qfex", "api_secret"): "QFEX SECRET API key (not a wallet private key)",
+    ("qfex", "account_id"): "QFEX target account UUID (primary or subaccount)",
     ("hyperliquid", "user_address"): "wallet address",
     ("txflow", "user_address"): "wallet address",
     ("ondo", "api_key"): "api key",
