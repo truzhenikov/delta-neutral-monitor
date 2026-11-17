@@ -364,6 +364,8 @@ class FundingReportService:
                 warnings.append(f"Extended — неполные данные за полный период: {exc}.")
             except Exception as exc:
                 warnings.append(f"Extended — не удалось получить полную историю: {type(exc).__name__}.")
+        if self._enabled_refs("qfex"):
+            warnings.append("QFEX — история funding не интегрирована; начисления неизвестны и не включены в итог.")
         rows.sort(key=lambda row: (-row.amount_usd, row.exchange, row.symbol))
         return FundingReport(
             start=start,

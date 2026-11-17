@@ -59,12 +59,12 @@ def build_default_credential_validation_service(supported_exchanges: list[str]) 
         )
 
     async def _qfex(payload: dict[str, str]) -> CredentialValidationResult:
-        from src.connectors.qfex_connector import validate_credentials
+        from src.connectors.qfex_connector import QfexRealConnector
 
-        validate_credentials(payload)
+        await QfexRealConnector().fetch_snapshot_with_credentials(payload)
         return CredentialValidationResult(
-            ok=True, checked=False,
-            message="QFEX credential format validated locally; live account verification not performed.",
+            ok=True, checked=True,
+            message="QFEX account scope and read-only snapshot verified; key write restrictions not tested.",
         )
 
     validators: dict[str, Callable[[dict[str, str]], Awaitable[CredentialValidationResult]]] = {

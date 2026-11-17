@@ -27,12 +27,12 @@ def test_registry_factory_menu_defaults(tmp_path):
     from src.bot.keyboards import build_setup_exchange_keyboard
     from src.bot.setup_flow import FIELD_LABELS
     from src.config import Settings
-    assert CredentialStore.SUPPORTED_EXCHANGES.get('qfex') == ('api_key', 'api_secret', 'account_id')
+    assert CredentialStore.SUPPORTED_EXCHANGES.get('qfex') == ('api_key', 'api_secret')
     assert type(build_connectors(['qfex:desk'])[0]).__name__ == 'QfexRealConnector'
     assert type(build_connectors(['qfex:desk'], True)[0]).__name__ == 'QfexConnector'
     assert build_connectors(['qfex:desk'])[0].exchange == 'qfex:desk'
     assert any(b.callback_data == 'setup_exchange:qfex' for r in build_setup_exchange_keyboard().inline_keyboard for b in r)
-    assert ('qfex', 'account_id') in FIELD_LABELS
+    assert ('qfex', 'account_id') not in FIELD_LABELS
     defaults = Settings.model_fields['enabled_exchanges'].default.split(',')
     assert 'qfex' not in defaults
     store = CredentialStore(tmp_path / 'missing.json')
@@ -58,6 +58,9 @@ def install(monkeypatch, qf, payload=None, status=200, refdata=None):
         calls.append(request)
         data = (REFDATA if refdata is None else refdata) if request.url.path == '/refdata' else (
             {'balance': BALANCE, 'positions': [ROW]} if payload is None else payload)
+        if request.url.path == '/user/subaccounts/balance':
+            data = {'accounts': [{'account_id': CREDS['account_id'], 'is_master': True,
+                                  'equity': 1000, 'available_balance': 750}]}
         return httpx.Response(status, content=json.dumps(data), headers={'content-type': 'application/json'})
     monkeypatch.setattr(qf.httpx, 'AsyncClient', lambda **kw: original(transport=httpx.MockTransport(handler), **kw))
     return calls
@@ -84,7 +87,10 @@ async def test_signed_mapping_equity_and_mark_not_last_or_oracle(setup, monkeypa
             assert 'x-qfex-public-key' not in h
         else:
             assert h['x-qfex-public-key'] == CREDS['api_key']
-            assert h['x-qfex-requested-account-id'] == CREDS['account_id']
+            if request.url.path == '/user/subaccounts/balance':
+                assert 'x-qfex-requested-account-id' not in h
+            else:
+                assert h['x-qfex-requested-account-id'] == CREDS['account_id']
             message = f'{h["x-qfex-nonce"]}:{h["x-qfex-timestamp"]}'.encode()
             assert h['x-qfex-hmac-signature'] == hmac.new(CREDS['api_secret'].encode(), message, hashlib.sha256).hexdigest()
 
@@ -150,14 +156,16 @@ async def test_http_failures_sanitized(setup, monkeypatch, status):
 
 
 @pytest.mark.asyncio
-async def test_local_credential_validation_is_not_private_verification():
+async def test_credential_validation_checks_live_scope_and_snapshot(setup, monkeypatch):
     from src.services.credential_validation import build_default_credential_validation_service
+    qf, _ = setup
+    install(monkeypatch, qf)
     service = build_default_credential_validation_service(['qfex'])
     bad = await service.validate('qfex', {})
     assert not bad.ok
     good = await service.validate('qfex', CREDS)
-    assert good.ok and not good.checked
-    assert 'live account verification not performed' in good.message
+    assert good.ok and good.checked
+    assert 'key write restrictions not tested' in good.message
 
 
 @pytest.mark.asyncio

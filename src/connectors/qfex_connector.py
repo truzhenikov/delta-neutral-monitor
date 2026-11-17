@@ -29,18 +29,51 @@ API_VERSION = '2026-10-29'
 
 
 def validate_credentials(credentials: dict[str, str]) -> dict[str, str]:
-    """Require an explicit target, including for a primary account; never guess."""
+    """Require the keypair; an optional explicit account remains authoritative."""
     try:
-        for name in ('api_key', 'api_secret', 'account_id'):
+        for name in ('api_key', 'api_secret'):
             value = credentials[name]
             if not isinstance(value, str) or not value or value.strip() != value or any(ord(c) < 33 or ord(c) > 126 for c in value):
                 raise ValueError
-        account = credentials['account_id']
-        if str(UUID(account)) != account.lower():
+        account = credentials.get('account_id', '')
+        if account != '' and (not isinstance(account, str) or str(UUID(account)) != account.lower() or UUID(account).int == 0):
             raise ValueError
     except (KeyError, TypeError, ValueError, AttributeError):
-        raise RealConnectorNotConfiguredError('qfex requires api_key (PUBLIC), api_secret (SECRET), and account_id (UUID)') from None
-    return {name: credentials[name] for name in ('api_key', 'api_secret', 'account_id')}
+        raise RealConnectorNotConfiguredError('qfex requires api_key (PUBLIC), api_secret (SECRET); optional account_id must be a UUID') from None
+    result = {name: credentials[name] for name in ('api_key', 'api_secret')}
+    if account:
+        result['account_id'] = account
+    return result
+
+
+def resolve_account(credentials: dict[str, str], payload) -> dict[str, str]:
+    """Validate the entire returned scope before selecting a singleton or explicit target."""
+    accounts = payload.get('accounts') if isinstance(payload, dict) else None
+    if not isinstance(accounts, list) or not accounts:
+        raise RealConnectorRequestError('qfex missing account scope')
+    identities = set()
+    for row in accounts:
+        try:
+            identity = row['account_id']
+            if not isinstance(identity, str) or str(UUID(identity)) != identity.lower() or UUID(identity).int == 0:
+                raise ValueError
+            if identity.lower() in identities or not isinstance(row.get('is_master'), bool):
+                raise ValueError
+            _number(row, 'equity')
+            _number(row, 'available_balance')
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise RealConnectorRequestError('qfex invalid account scope') from None
+        identities.add(identity.lower())
+    explicit = credentials.get('account_id')
+    if explicit:
+        if explicit.lower() not in identities:
+            raise RealConnectorRequestError('qfex configured account is outside returned scope')
+        selected = explicit
+    elif len(identities) == 1:
+        selected = next(iter(identities))
+    else:
+        raise RealConnectorRequestError('qfex multiple accounts: choose an explicit account_id; no primary fallback')
+    return dict(credentials, account_id=selected)
 
 
 def _number(row: dict, field: str, *, nonnegative: bool = False) -> Decimal:
@@ -60,25 +93,36 @@ def _headers(credentials: dict[str, str]) -> dict[str, str]:
     nonce = secrets.token_hex(16)
     timestamp = str(int(time.time()))
     signature = hmac.new(credentials['api_secret'].encode(), f'{nonce}:{timestamp}'.encode(), hashlib.sha256).hexdigest()
-    return {'x-qfex-public-key': credentials['api_key'], 'x-qfex-nonce': nonce,
-            'x-qfex-timestamp': timestamp, 'x-qfex-hmac-signature': signature,
-            'x-qfex-requested-account-id': credentials['account_id']}
+    headers = {'x-qfex-public-key': credentials['api_key'], 'x-qfex-nonce': nonce,
+            'x-qfex-timestamp': timestamp, 'x-qfex-hmac-signature': signature}
+    if credentials.get('account_id'):
+        headers['x-qfex-requested-account-id'] = credentials['account_id']
+    return headers
 
 
 class QfexRealConnector(ExchangeConnector):
     exchange = 'qfex'
 
     async def _query(self, client: httpx.AsyncClient, path: str, credentials: dict[str, str]):
-        if path not in ('/refdata', '/user/positions'):
+        if path not in ('/refdata', '/user/positions', '/user/subaccounts/balance'):
             raise RealConnectorRequestError('qfex unsupported read endpoint')
+        if path == '/user/positions' and not credentials.get('account_id'):
+            raise RealConnectorRequestError('qfex account scope must be resolved before positions')
         try:
             response = await client.get(ORIGIN + path, params={'api_version': API_VERSION},
-                                        headers={} if path == '/refdata' else _headers(credentials))
+                                        headers={} if path == '/refdata' else _headers(
+                                            {k: v for k, v in credentials.items() if k != 'account_id'}
+                                            if path == '/user/subaccounts/balance' else credentials))
             if response.status_code != 200:
                 raise RealConnectorRequestError(f'qfex HTTP {response.status_code}')
             return response.json(parse_float=Decimal)
         except (httpx.HTTPError, ValueError):
             raise RealConnectorRequestError('qfex request or JSON response failed') from None
+
+    async def discover_credentials(self, client: httpx.AsyncClient, credentials: dict[str, str]) -> dict[str, str]:
+        credentials = validate_credentials(credentials)
+        scope = await self._query(client, '/user/subaccounts/balance', credentials)
+        return resolve_account(credentials, scope)
 
     async def fetch_account_snapshot(self) -> AccountSnapshot:
         settings = get_settings()
@@ -86,11 +130,15 @@ class QfexRealConnector(ExchangeConnector):
         if ':' not in self.exchange and not credentials:
             credentials = {'api_key': settings.qfex_api_key, 'api_secret': settings.qfex_api_secret,
                            'account_id': settings.qfex_account_id}
+        return await self.fetch_snapshot_with_credentials(credentials)
+
+    async def fetch_snapshot_with_credentials(self, credentials: dict[str, str]) -> AccountSnapshot:
         credentials = validate_credentials(credentials)
-        timeout = settings.request_timeout_sec
+        timeout = get_settings().request_timeout_sec
         try:
             async with asyncio.timeout(timeout):
                 async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+                    credentials = await self.discover_credentials(client, credentials)
                     refdata = await self._query(client, '/refdata', credentials)
                     account = await self._query(client, '/user/positions', credentials)
         except TimeoutError:

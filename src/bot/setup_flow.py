@@ -13,7 +13,7 @@ from src.services.telegram_preferences import TelegramPreferencesService
 FIELD_LABELS: dict[tuple[str, str], str] = {
     ("qfex", "api_key"): "QFEX PUBLIC API key (view-only permissions)",
     ("qfex", "api_secret"): "QFEX SECRET API key (not a wallet private key)",
-    ("qfex", "account_id"): "QFEX target account UUID (primary or subaccount)",
+
     ("hyperliquid", "user_address"): "wallet address",
     ("txflow", "user_address"): "wallet address",
     ("ondo", "api_key"): "api key",
@@ -157,6 +157,18 @@ class TelegramSetupFlow:
             return self._prompt_for_current_field(session)
 
         exchange_ref = self._exchange_ref(session)
+        if session.exchange == "qfex":
+            # Retain an existing deliberate target when rotating its keypair.
+            account_id = self.credential_store.get_exchange_credentials(exchange_ref).get("account_id")
+            if account_id:
+                session.payload["account_id"] = account_id
+            validation = await self.validation_service.validate(session.exchange, session.payload)
+            if not validation.ok or not validation.checked:
+                self._sessions.pop(chat_id, None)
+                return f"QFEX не сохранён и не включён. {validation.message} Повторите /setup после исправления."
+            self.credential_store.set_exchange_credentials(exchange_ref, session.payload)
+            self._sessions.pop(chat_id, None)
+            return f"Данные для {exchange_ref} сохранены и биржа включена. Проверка пройдена. {validation.message}"
         self.credential_store.set_exchange_credentials(exchange_ref, session.payload)
         validation = await self.validation_service.validate(session.exchange, session.payload)
         self._sessions.pop(chat_id, None)

@@ -2,11 +2,10 @@
 
 ## Support versus activation
 
-Installed source support is **not** an activated or authenticated account. QFEX
+Installed source support alone does **not** activate an account. QFEX
 is omitted from `ENABLED_EXCHANGES` defaults and the sample enabled list; a
-missing credential store therefore does not activate it. This integration does
-not create a production profile, change enabled venues, restart services, touch
-Sheets, or enable scheduled funding collection. Reopen the Telegram setup menu
+missing credential store therefore does not activate it. Production activation
+requires separately authorized, authenticated credentials. Reopen the Telegram setup menu
 after deploying source to the bot to see `qfex`. The enable/disable menu lists
 saved profiles only; without credentials there is intentionally no QFEX profile.
 
@@ -20,11 +19,17 @@ Provide only:
 | --- | --- | --- |
 | `api_key` | `QFEX_API_KEY` | PUBLIC API key |
 | `api_secret` | `QFEX_API_SECRET` | SECRET API key, used literally as the HMAC key |
-| `account_id` | `QFEX_ACCOUNT_ID` | Exact target account UUID, including for the primary account |
+| `account_id` (optional) | `QFEX_ACCOUNT_ID` | Deliberate target UUID when the key can access multiple accounts |
 
-The explicit account UUID prevents accidentally monitoring the primary account
-when a subaccount was intended. The connector sends it as
-`x-qfex-requested-account-id`. Named profiles never borrow environment credentials
+Only the keypair is required. The connector first authenticates
+`GET /user/subaccounts/balance` and validates the complete returned account scope.
+Exactly one account is selected automatically. With multiple accounts, an explicit
+configured `account_id` must belong to that scope; otherwise selection fails closed,
+even if one account is marked master. Empty/malformed/duplicate identities fail closed.
+The resolved target is reused within that snapshot and always sent to
+`/user/positions` as `x-qfex-requested-account-id`: omission is never a primary-account
+fallback. An existing explicit target survives credential rotation and storage.
+Named profiles never borrow environment credentials
 or another profile's keys. No wallet private key, password, JWT, MFA code, or
 WebSocket session is needed.
 
@@ -33,14 +38,14 @@ if the dedicated key is also intended for a later historical-funding probe.
 Disable **`execute_orders`** and **`deposit_withdraw`**. Use a normal manually
 created key, not a builder-issued trading key (builder keys can have additional
 withdrawal capability). The monitor never tests permissions by attempting a write.
-Local format validation is not authentication or proof of key restrictions.
+Successful account GETs are not proof of key restrictions.
 
-Telegram `/setup qfex <profile>` collects these three fields using the shared
-setup workflow. **As with other existing venues, finishing setup saves and
-enables that profile.** Do not use it merely to stage unverified credentials.
-Stage any candidate outside the production store, privately verify it, and obtain
-explicit activation approval first. No credentials have been supplied for this
-implementation.
+Telegram `/setup qfex <profile>` collects only PUBLIC and SECRET keys, with no
+Account ID question. It verifies discovery and the snapshot **before** saving and
+enabling the profile. Failed authentication, ambiguous scope or snapshot errors
+leave the existing store untouched. Multiple-account keys require deliberate target
+configuration through the optional store/environment field, not guessed selection.
+Do not use setup merely to stage credentials: successful completion enables monitoring.
 
 ## Documented API contract
 
@@ -48,8 +53,11 @@ All traffic goes to the fixed official origin `https://api.qfex.com`, with
 `api_version=2026-10-29`. Redirects are disabled; arbitrary origins and trading
 endpoints are not configurable or accepted. The connector performs only:
 
-1. Public `GET /refdata`: validate the instrument's base/quote/margin assets.
-2. Authenticated `GET /user/positions`: complete positions plus native balance.
+1. Authenticated `GET /user/subaccounts/balance`: discover and validate account scope
+   using the keypair without a requested-account header.
+2. Public `GET /refdata`: validate the instrument's base/quote/margin assets.
+3. Authenticated `GET /user/positions`: complete positions plus native balance,
+   with the resolved explicit account header.
 
 The REST endpoint supplies the snapshot directly; no Trade WebSocket is needed.
 The WebSocket documentation warns that initial cached balances can be zero before
@@ -118,9 +126,10 @@ maximum `limit=100` without a cursor/offset contract; completeness under capped
 results, `amount` cashflow sign, supported `currency`/`state` values and actual
 account permissions need a private nonempty ledger probe before promising exact
 history. No fabricated private success or zero-funding fallback is supplied.
-QFEX is not included in existing daily funding totals; this must be addressed
-before approving its activation for scheduled reporting. Scheduled reports and
-their configuration were intentionally left unchanged. A future collector should split saturated
+QFEX is not included in daily funding totals. While a QFEX profile is enabled,
+the report is marked incomplete and visibly warns that QFEX history is not integrated;
+unknown accruals are never presented as verified zero. Schedules are unchanged.
+A future collector should split saturated
 windows safely, fail on saturated minimal intervals, and independently reconcile
 signed amounts for the exact window before report activation.
 
@@ -140,10 +149,12 @@ contract and HTTP 200 JSON for both public metadata routes:
 - `GET /refdata?api_version=2026-10-29`
 - `GET /md/contracts?api_version=2026-10-29`
 
-Public metadata proves route/contract availability only. No QFEX API credentials
-were available; authenticated balances, nonzero positions, account identity,
-key restrictions, native equity reconciliation, and execution history remain
-**private-live unverified**. Before activation, use an isolated candidate store;
+Authenticated key-only live verification on 2026-11-17 resolved the sole master
+account through `/user/subaccounts/balance`; the snapshot matched native equity
+and availability of **1099.81**, maintenance **0**, positions **0**. No user-supplied
+Account ID was needed for this probe. This validates flat-account reads, not
+nonzero position/mark mapping, native liquidation prices, key write restrictions,
+or execution history. Before another activation, use isolated candidate credentials;
 compare the intended account's UI and `/user/subaccounts/balance` native equity
 with the snapshot, check both a short and long nonzero position where available,
 and verify the missing-liquidation warning is acceptable. Restart only relevant
