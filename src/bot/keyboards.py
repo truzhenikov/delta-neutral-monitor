@@ -121,16 +121,20 @@ def build_alert_settings_keyboard() -> Any:
 
 def build_exchange_toggle_keyboard(action: str, store: CredentialStore) -> Any:
     prefix = _TOGGLE_CALLBACK_PREFIXES[action]
-    return _build_exchange_selection_keyboard(store, prefix)
+    return _build_exchange_selection_keyboard(store, prefix, enabled_only=action == "disable_exchange")
 
 
 def build_remove_exchange_keyboard(store: CredentialStore) -> Any:
     return _build_exchange_selection_keyboard(store, _REMOVE_CALLBACK_PREFIX)
 
 
-def _build_exchange_selection_keyboard(store: CredentialStore, callback_prefix: str) -> Any:
+def _build_exchange_selection_keyboard(
+    store: CredentialStore, callback_prefix: str, *, enabled_only: bool = False
+) -> Any:
     InlineKeyboardButton, InlineKeyboardMarkup = _inline_keyboard_types()
     configured = store.list_configured_exchanges()
+    if enabled_only:
+        configured = [item for item in configured if item["enabled"]]
     rows = [[InlineKeyboardButton(text=item["exchange"], callback_data=f"{callback_prefix}{item['exchange']}")] for item in configured]
     rows.append([InlineKeyboardButton(text="Отмена", callback_data=f"{callback_prefix}{_REMOVE_CANCEL}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

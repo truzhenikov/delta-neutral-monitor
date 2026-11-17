@@ -110,6 +110,39 @@ def test_build_enable_exchange_keyboard_lists_profiles_and_cancel(tmp_path: Path
     assert parse_exchange_toggle_callback("enable_exchange", "disable_exchange:okx:main") is None
 
 
+def test_disable_exchange_keyboard_filters_disabled_profiles_and_refreshes(tmp_path: Path) -> None:
+    from src.bot.keyboards import build_exchange_toggle_keyboard, build_remove_exchange_keyboard
+    from src.services.credential_store import CredentialStore
+
+    store = CredentialStore(tmp_path / "credentials.json")
+    store.set_exchange_credentials("ondo:enabled", {"api_key": "key", "api_secret": "secret"})
+    store.set_exchange_credentials("ondo:disabled", {"api_key": "other", "api_secret": "other"})
+    store.set_exchange_enabled("ondo:disabled", False)
+    before = store.storage_path.read_bytes()
+
+    markup = build_exchange_toggle_keyboard("disable_exchange", store)
+    assert [button.callback_data for row in markup.inline_keyboard for button in row] == [
+        "disable_exchange:ondo:enabled", "disable_exchange:cancel",
+    ]
+    # Filtering is specific to disabling; removal must still include disabled profiles.
+    removal = build_remove_exchange_keyboard(store)
+    assert [button.text for row in removal.inline_keyboard for button in row] == [
+        "ondo:disabled", "ondo:enabled", "Отмена",
+    ]
+    assert store.storage_path.read_bytes() == before
+
+    store.set_exchange_enabled("ondo:enabled", False)
+    empty = build_exchange_toggle_keyboard("disable_exchange", store)
+    assert [button.callback_data for row in empty.inline_keyboard for button in row] == [
+        "disable_exchange:cancel",
+    ]
+    store.set_exchange_enabled("ondo:disabled", True)
+    refreshed = build_exchange_toggle_keyboard("disable_exchange", store)
+    assert [button.text for row in refreshed.inline_keyboard for button in row] == [
+        "ondo:disabled", "Отмена",
+    ]
+
+
 def test_build_alert_settings_keyboard_contains_liq_threshold_button_and_cancel() -> None:
     from src.bot.keyboards import build_alert_settings_keyboard, parse_alert_settings_callback
 
