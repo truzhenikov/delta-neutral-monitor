@@ -85,6 +85,17 @@ def test_official_labels_and_public_metadata_no_auth_once(tmp_path):
     assert not calls[0].kwargs.get('headers') and not calls[0].kwargs.get('params')
 
 
+def test_usdjpy_funding_matches_position_label_even_without_metadata(tmp_path):
+    async def request(method, url, **kwargs):
+        if url.endswith('/quote/contracts'):
+            raise RuntimeError('metadata unavailable')
+        return page([row(symbol='NCFXUSD2JPY-USDT')])
+    report = asyncio.run(service(tmp_path, request).build_report(NOW))
+    assert report.complete
+    assert report.rows[0].symbol == 'USDJPY'
+    assert report.rows[0].amount_usd == Decimal('0.64710945')
+
+
 def test_metadata_failure_falls_back_without_losing_funding(tmp_path):
     async def request(method, url, **kwargs):
         if url.endswith('/quote/contracts'):

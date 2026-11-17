@@ -18,13 +18,21 @@ class Position:
     mark_price: float
     leverage: float
     liquidation_price: float | None
+    # Venue-valued settlement amounts for instruments whose quote is not USD.
+    # size remains USD-mark-equivalent units for cross-venue matching, not lots.
+    native_notional_usd: float | None = None
+    native_pnl_usd: float | None = None
 
     @property
     def notional_usd(self) -> float:
+        if self.native_notional_usd is not None:
+            return self.native_notional_usd
         return abs(self.size) * self.mark_price
 
     @property
     def pnl_usd(self) -> float:
+        if self.native_pnl_usd is not None:
+            return self.native_pnl_usd
         direction = 1 if self.side == "long" else -1
         return (self.mark_price - self.entry_price) * self.size * direction
 

@@ -6,6 +6,7 @@ import collections
 import hashlib
 import hmac
 import json
+import math
 import time
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -17,6 +18,7 @@ import httpx
 
 from src.config import get_settings
 from src.connectors.base import ExchangeConnector
+from src.core.instruments import BINGX_VERIFIED_SYMBOLS
 from src.core.models import AccountSnapshot, Position, utc_now
 from src.services.credential_store import CredentialStore
 
@@ -446,6 +448,44 @@ class BitgetRealConnector(_BaseRealConnector):
 class BingxRealConnector(_BaseRealConnector):
     exchange = "bingx"
 
+    def _fx_position(self, row: dict[str, Any]) -> Position | None:
+        # Forex uses quote-currency -> USDT middle rates, not a fixed multiplier.
+        # See docs/bingx-fx-units.md. Only USDJPY has been reconciled live.
+        def number(field: str, *, positive: bool = False) -> float:
+            try:
+                value = Decimal(str(row.get(field)))
+                if not value.is_finite() or (positive and value <= 0):
+                    raise ValueError
+                result = float(value)
+                if not math.isfinite(result):
+                    raise ValueError
+                return result
+            except (InvalidOperation, ValueError, TypeError, OverflowError) as exc:
+                raise RealConnectorRequestError(f"BingX FX invalid {field}") from exc
+
+        amount = number("positionAmt")
+        if amount == 0:
+            return None
+        if (amount < 0 or row.get("symbol") != "NCFXUSD2JPY-USDT"
+                or row.get("currency") != "USDT"
+                or row.get("positionSide") not in {"LONG", "SHORT"}):
+            raise RealConnectorRequestError("BingX FX unsupported contract, currency or side")
+        mark = number("markPrice", positive=True)
+        notional = number("positionValue", positive=True)
+        # USD mark-equivalent quantity matches the other venue's USDJPY synthetic.
+        # This is a valuation conversion, NOT a contract multiplier or order size.
+        size = notional / mark
+        if not math.isfinite(size) or size <= 0:
+            raise RealConnectorRequestError("BingX FX invalid normalized size")
+        return Position(
+            exchange=self.exchange, symbol=BINGX_VERIFIED_SYMBOLS[row["symbol"]],
+            side="short" if row["positionSide"] == "SHORT" else "long",
+            size=size, entry_price=number("avgPrice", positive=True), mark_price=mark,
+            leverage=number("leverage", positive=True),
+            liquidation_price=_safe_liq_price(row.get("liquidationPrice")),
+            native_notional_usd=notional, native_pnl_usd=number("unrealizedProfit"),
+        )
+
     def _build_signed_params(self, params: dict[str, Any] | None = None) -> tuple[dict[str, Any], dict[str, str]]:
         settings = get_settings()
         credentials = _runtime_credentials(self.exchange)
@@ -494,6 +534,12 @@ class BingxRealConnector(_BaseRealConnector):
 
         positions: list[Position] = []
         for row in raw_positions:
+            symbol = str(row.get("symbol", "UNKNOWN"))
+            if symbol.startswith("NCFX"):
+                position = self._fx_position(row)
+                if position is not None:
+                    positions.append(position)
+                continue
             size = _safe_float(row.get("positionAmt"))
             if size <= 0:
                 continue
@@ -501,7 +547,7 @@ class BingxRealConnector(_BaseRealConnector):
             positions.append(
                 Position(
                     exchange=self.exchange,
-                    symbol=str(row.get("symbol", "UNKNOWN")),
+                    symbol=symbol,
                     side=side,
                     size=size,
                     entry_price=_safe_float(row.get("avgPrice")),

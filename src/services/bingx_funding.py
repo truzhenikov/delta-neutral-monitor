@@ -10,6 +10,7 @@ from time import time
 from typing import Any, Awaitable, Callable
 from urllib.parse import urlencode
 
+from src.core.instruments import BINGX_VERIFIED_SYMBOLS
 from src.services.credential_store import CredentialStore
 
 MAX_REQUESTS = 256
@@ -117,6 +118,6 @@ async def fetch_bingx_funding(
         labels = {}
     display_totals: dict[str, Decimal] = {}
     for symbol, amount in totals.items():
-        label = labels.get(symbol, symbol).removesuffix('-USDT')
+        label = BINGX_VERIFIED_SYMBOLS.get(symbol, labels.get(symbol, symbol)).removesuffix('-USDT')
         display_totals[label] = display_totals.get(label, Decimal('0')) + amount
     return display_totals
