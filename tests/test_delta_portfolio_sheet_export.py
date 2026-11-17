@@ -17,6 +17,8 @@ def test_var_3c3b_reuses_the_former_kucoin_sheet_column() -> None:
 
 
 def test_new_ondo_profile_has_its_own_destination_without_replacing_existing_accounts() -> None:
+    assert exporter.EXCHANGE_TO_HEADER['ondo:ondo-3b32'] == 'Ondo-3b32'
+    assert 'ondo:ondo-3b32' not in exporter.IGNORED_EXCHANGES
     assert exporter.EXCHANGE_TO_HEADER['ondo:ondo-4119'] == 'Ondo-4119'
     assert exporter.EXCHANGE_TO_HEADER['ondo:ondo-3c3b'] == 'Ondo'
     assert exporter.EXCHANGE_TO_HEADER['ondo:ondo-44c3'] == 'Ondo-44c3'

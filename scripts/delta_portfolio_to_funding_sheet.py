@@ -51,6 +51,7 @@ EXCHANGE_TO_HEADER = {
     "ondo:ondo-3c3b": "Ondo",
     "ondo:ondo-44c3": "Ondo-44c3",
     "ondo:ondo-4119": "Ondo-4119",
+    "ondo:ondo-3b32": "Ondo-3b32",
     "phemex:phemex": "Phemex",
     "risex:risex-f504": "RiseX",
     "txflow:txflow-44c3": "Txflow",
