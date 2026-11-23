@@ -75,11 +75,12 @@ def test_qfex_funding_history_is_missing_not_zero(tmp_path: Path):
     from src.services.funding_report_service import FundingReportService
     store = CredentialStore(tmp_path / 'credentials.json')
     store.set_exchange_credentials('qfex:main', CREDS)
-    service = FundingReportService(store, tmp_path / 'funding.json')
+    from unittest.mock import AsyncMock
+    service = FundingReportService(store, tmp_path / 'funding.json', request_json=AsyncMock(side_effect=RuntimeError('history denied')))
     report = asyncio.run(service.build_report())
     assert not report.complete
     assert report.rows == []
-    assert any('QFEX' in w and 'не интегрирована' in w for w in report.warnings)
+    assert any('QFEX' in w and 'полную историю' in w for w in report.warnings)
     store.set_exchange_enabled('qfex:main', False)
     assert asyncio.run(service.build_report()).complete
 

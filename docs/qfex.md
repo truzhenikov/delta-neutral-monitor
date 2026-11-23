@@ -33,8 +33,8 @@ Named profiles never borrow environment credentials
 or another profile's keys. No wallet private key, password, JWT, MFA code, or
 WebSocket session is needed.
 
-Enable `view_positions` and `view_balance` for snapshots; enable `view_orders`
-if the dedicated key is also intended for a later historical-funding probe.
+Enable `view_positions` and `view_balance` for snapshots, plus the documented
+history permission `view_orders` for settled funding executions.
 Disable **`execute_orders`** and **`deposit_withdraw`**. Use a normal manually
 created key, not a builder-issued trading key (builder keys can have additional
 withdrawal capability). The monitor never tests permissions by attempting a write.
@@ -102,36 +102,55 @@ margin guide saying all products are cross-margined; do not silently mix them.
   failure fails the entire snapshot. Long and short mappings have separate tests.
 - Values are **nominal USDC collateral / USD quote**, not an independently fetched
   USDC/USD conversion. This follows the existing model's `*_usd` convention.
-- Native per-position liquidation prices and a liquidation-state flag are absent
-  from this REST contract. Keep `liquidation_price=None`, never zero or a generic
-  leverage-derived estimate. The risk engine emits a QFEX-specific warning for
-  open positions with unknown liquidation distance, so they cannot appear as
-  fully known low risk merely because the portfolio net delta is hedged. This
-  connector cannot supply liquidation-distance threshold alerts. Native account
-  maintenance remains available; local cross/isolated risk still needs operator
-  review before activation.
+- REST still has no native per-position liquidation price or liquidation-state flag.
+  The connector now computes the **documented cross-margin boundary**, independently
+  confirmed against QFEX's public trading frontend. This is a calculated conditional
+  price, **not an exchange-returned native price**, and not an execution-price prediction.
+  Let `E` be full account equity, `M` native account `position_margin`, `q` signed
+  position quantity, `P` current mark, and `r = 2 / (3 * selected_leverage)`. Holding
+  every other mark, all quantities, cash and selected leverages fixed:
+
+  ```text
+  E(x) = E + q * (x - P)
+  M(x) = M + abs(q) * r * (x - P)
+  liquidation_boundary = P - (E - M) / (q - abs(q) * r)
+  ```
+
+  This solves the published `Account Equity = Maintenance Margin` boundary;
+  liquidation begins strictly below it. All positions' current maintenance and
+  equity are included, not just this symbol's collateral. Order margin is **not**
+  subtracted from equity: QFEX releases it in the liquidation procedure. A changed
+  position, funding payment, fee, transfer, leverage, or another mark changes the
+  result. Distance thresholds now use this price, including zero/negative distances
+  for an already-reached/breached boundary. Risk warnings explicitly identify the
+  calculation and fixed-other-input assumptions. A negative root is represented by
+  `None` (no nonnegative crossing in this scenario), not zero or a safety guarantee;
+  the existing unavailable-distance warning remains. Maintenance rates >= 1 and
+  nonfinite results fail closed. Isolated accounts remain unsupported.
+
+  Evidence: official Definitions gives `sum(abs(q) * mark * 2/(3*L))`; official
+  Margin and Liquidations gives `E < M`. On 2026-11-23 the public application bundle
+  `https://www.qfex.com/assets/index-Cd1w1ehH.js` contained `AT=2/3`, maintenance
+  helper `Fv`, cross-price helper `lM`, and `X4e` calling it for cross positions.
+  `lM` computes `mark - sign(q)*(E-M)/(abs(q)*(1-(2/3/L)*sign(q)))`, the same
+  algebraic formula. The pinned REST/refdata schemas contain no additional native
+  liquidation field. No WebSocket, trading requests or account modifications are
+  needed. This is source verification, not visual reconciliation with the UI.
 - `updated_at` is receipt time; this API response has no documented snapshot-age
   field. Receipt does not prove exchange-side freshness. Reconcile against the UI.
 
-## Historical funding: deliberately not enabled
+## Historical funding
 
-QFEX does have a documented account ledger, `GET /executions`, distinct from
-public `/funding/{symbol}` rates and current `net_funding` counters. The execution
-guide documents `execution_type=funding`, inclusive UTC ISO request bounds and
-fractional Unix-second response `created_at`. It returns settled balance movements.
+The daily funding service now reads authenticated `GET /executions` with
+`execution_type=funding`, independently of currently open positions. Native signed
+settled balance movements are summed with Decimal for the exact completed
+11:30–11:30 Moscow `[start,end)` window. Inclusive API bounds are filtered locally;
+capped ranges are split and stable IDs deduplicated. Invalid, incomplete or denied
+history fails closed instead of becoming zero. Schedules are unchanged.
 
-This change does **not** wire a QFEX daily funding collector or reconstruct
-payments from current positions/rates. The pinned schema exposes `count` and a
-maximum `limit=100` without a cursor/offset contract; completeness under capped
-results, `amount` cashflow sign, supported `currency`/`state` values and actual
-account permissions need a private nonempty ledger probe before promising exact
-history. No fabricated private success or zero-funding fallback is supplied.
-QFEX is not included in daily funding totals. While a QFEX profile is enabled,
-the report is marked incomplete and visibly warns that QFEX history is not integrated;
-unknown accruals are never presented as verified zero. Schedules are unchanged.
-A future collector should split saturated
-windows safely, fail on saturated minimal intervals, and independently reconcile
-signed amounts for the exact window before report activation.
+Live verification reproduced a real PANW charge of **-0.01048746 USD**; the latest
+completed daily window was independently empty. See [qfex-funding.md](qfex-funding.md)
+for the contract, bounded completeness guarantees and verification evidence.
 
 ## Verification evidence and activation gate
 
@@ -160,6 +179,15 @@ with the snapshot, check both a short and long nonzero position where available,
 and verify the missing-liquidation warning is acceptable. Restart only relevant
 consumers after separate deployment/activation approval, verify `/v1/status`, and
 reconcile downstream export mappings before enabling any scheduled output.
+
+Read-only verification on 2026-11-23 also exercised a nonzero `qfex:main` account:
+PANW-USD long 12, recovered mark **348.0699999966667**, native equity
+**1090.9076925**, native maintenance **139.22798608**. The calculated boundary
+was **266.02864599494256**, distance **23.570360560378603%**. Independently
+substituting that price into `E(x)-M(x)` left a residual **-2.4e-14** nominal
+collateral units. These are moving snapshot values, not a fixed forecast. The
+live probe used only the same three GET endpoints; no service was restarted,
+no account/order state was changed, and no visual UI match is claimed.
 
 ## Official sources
 

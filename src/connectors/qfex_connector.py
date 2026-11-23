@@ -204,9 +204,24 @@ class QfexRealConnector(ExchangeConnector):
                 math.isfinite(float(v)) for v in (mark, abs(qty) * mark, equity)
             ):
                 raise RealConnectorRequestError('qfex invalid position valuation')
+            # Exact documented E(P)=M(P) boundary, also used by QFEX's public
+            # trading UI (lM in index-Cd1w1ehH.js). All other marks, quantities,
+            # cash and leverages are held fixed; this is NOT a native REST field.
+            # E(P) = equity + qty*(P-mark)
+            # M(P) = maintenance + abs(qty)*2/(3*leverage)*(P-mark)
+            # Order margin is released during liquidation, not subtracted again.
+            rate = Decimal(2) / (3 * leverage)
+            if rate >= 1:
+                raise RealConnectorRequestError('qfex unsupported maintenance rate')
+            liquidation = mark - (equity - maintenance) / (qty - abs(qty) * rate)
+            if not math.isfinite(float(liquidation)):
+                raise RealConnectorRequestError('qfex invalid calculated liquidation price')
+            # A negative root means no nonnegative crossing under this scenario,
+            # not a zero liquidation price and not proof of account-wide safety.
+            liq_price = float(liquidation) if liquidation >= 0 else None
             positions.append(Position(exchange=self.exchange, symbol=symbol,
                 side='long' if qty > 0 else 'short', size=float(abs(qty)), entry_price=float(entry),
-                mark_price=float(mark), leverage=float(leverage), liquidation_price=None))
+                mark_price=float(mark), leverage=float(leverage), liquidation_price=liq_price))
         if not math.isfinite(float(equity)):
             raise RealConnectorRequestError('qfex invalid equity')
         if not positions and maintenance != 0:

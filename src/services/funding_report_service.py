@@ -28,6 +28,7 @@ from src.services.woofi_funding import fetch_woofi_funding
 from src.services.okx_funding import fetch_okx_funding
 from src.services.ondo_funding import fetch_ondo_funding
 from src.services.polymarket_funding import fetch_polymarket_funding
+from src.services.qfex_funding import fetch_qfex_funding
 from src.services.risex_funding import fetch_risex_funding
 from src.services.variational_funding import fetch_variational_funding
 
@@ -317,6 +318,7 @@ class FundingReportService:
             ("bitget", "Bitget", fetch_bitget_funding, self.bitget_api_base),
             ("backpack", "Backpack", fetch_backpack_funding, self.backpack_api_base),
             ("polymarket", "Polymarket", fetch_polymarket_funding, self.polymarket_api_base),
+            ("qfex", "QFEX", fetch_qfex_funding, "https://api.qfex.com"),
             ("risex", "RiseX", fetch_risex_funding, self.risex_api_base),
         ):
             refs = self._enabled_refs(venue)
@@ -364,8 +366,6 @@ class FundingReportService:
                 warnings.append(f"Extended — неполные данные за полный период: {exc}.")
             except Exception as exc:
                 warnings.append(f"Extended — не удалось получить полную историю: {type(exc).__name__}.")
-        if self._enabled_refs("qfex"):
-            warnings.append("QFEX — история funding не интегрирована; начисления неизвестны и не включены в итог.")
         rows.sort(key=lambda row: (-row.amount_usd, row.exchange, row.symbol))
         return FundingReport(
             start=start,

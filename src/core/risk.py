@@ -44,6 +44,13 @@ class RiskEngine:
                                if p.exchange.split(":", 1)[0] == "qfex" and p.liquidation_price is None})
         for exchange in unknown_qfex:
             warnings.append(f"{exchange}: liquidation distance unavailable; native maintenance only (cross margin)")
+        calculated_qfex = sorted({p.exchange for p in positions
+                                  if p.exchange.split(":", 1)[0] == "qfex" and p.liquidation_price is not None})
+        for exchange in calculated_qfex:
+            warnings.append(
+                f"{exchange}: liquidation distance calculated from documented cross-margin formula, not a native price; "
+                "other marks, quantities, cash and leverage held fixed"
+            )
         if margin_ratio >= self.max_margin_ratio:
             warnings.append(
                 f"Margin ratio {margin_ratio:.2f} >= threshold {self.max_margin_ratio:.2f}"

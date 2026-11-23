@@ -78,7 +78,7 @@ async def test_signed_mapping_equity_and_mark_not_last_or_oracle(setup, monkeypa
     assert (p.side, p.size, p.mark_price, p.entry_price, p.leverage) == ('short', 10, 110, 100, 10)
     assert p.delta_usd == -1100
     assert p.pnl_usd == -100
-    assert p.liquidation_price is None
+    assert p.liquidation_price == pytest.approx(185)  # whole-account equity - maintenance
     for request in calls:
         assert request.method == 'GET' and request.url.host == 'api.qfex.com'
         assert request.url.params['api_version'] == '2026-10-29'
@@ -241,6 +241,40 @@ def test_nonce_changes():
     first, second = _headers(CREDS), _headers(CREDS)
     assert first['x-qfex-nonce'] != second['x-qfex-nonce']
     assert len(bytes.fromhex(first['x-qfex-nonce'])) == 16
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('qty,equity,expected', [(10, 500, 110 - 300 / (10 * (1 - 2 / 30))),
+    (-10, 500, 110 + 300 / (10 * (1 + 2 / 30))),
+    (10, 200, 110), (10, 150, 110 + 50 / (10 * (1 - 2 / 30))),
+    (10, 2000, None)])
+async def test_cross_liquidation_formula_long_short_breach_and_no_positive_root(setup, monkeypatch, qty, equity, expected):
+    qf, connector = setup
+    row = dict(ROW, position=qty, unrealised_pnl=qty * 10)
+    install(monkeypatch, qf, {'balance': dict(BALANCE, available_balance=equity - 250), 'positions': [row]})
+    snapshot = await connector.fetch_account_snapshot()
+    p, = snapshot.positions
+    assert p.liquidation_price == pytest.approx(expected) if expected is not None else p.liquidation_price is None
+    if expected is not None:
+        # Independent reconstruction of E(P) = M(P), all other marks unchanged.
+        assert equity + qty * (p.liquidation_price - 110) == pytest.approx(
+            200 + abs(qty) * (p.liquidation_price - 110) * 2 / 30)
+        from src.core.risk import RiskEngine
+        risk = RiskEngine(.8, 4, 2000).evaluate([snapshot])
+        assert any('calculated' in warning and 'other marks' in warning for warning in risk.warnings)
+        if equity <= 200:
+            assert risk.min_liq_distance_pct <= 0
+
+
+@pytest.mark.asyncio
+async def test_cross_liquidation_uses_total_account_maintenance(setup, monkeypatch):
+    qf, connector = setup
+    second = dict(ROW, symbol='MSFT-USD', position=5, unrealised_pnl=50)
+    refdata = {'data': REFDATA['data'] + [dict(REFDATA['data'][0], symbol='MSFT-USD', base_asset='MSFT')]}
+    install(monkeypatch, qf, {'balance': BALANCE, 'positions': [ROW, second]}, refdata=refdata)
+    snapshot = await connector.fetch_account_snapshot()
+    assert snapshot.positions[0].liquidation_price == pytest.approx(185)
+    assert snapshot.positions[1].liquidation_price is None  # no nonnegative crossing
 
 
 def test_unknown_qfex_liquidation_is_visible_risk():
