@@ -261,9 +261,13 @@ async def test_cross_liquidation_formula_long_short_breach_and_no_positive_root(
             200 + abs(qty) * (p.liquidation_price - 110) * 2 / 30)
         from src.core.risk import RiskEngine
         risk = RiskEngine(.8, 4, 2000).evaluate([snapshot])
-        assert any('calculated' in warning and 'other marks' in warning for warning in risk.warnings)
+        assert not any('calculated from documented' in warning for warning in risk.warnings)
+        if equity == 500:
+            assert risk.risk_level == 'low'
+            assert risk.warnings == []
         if equity <= 200:
             assert risk.min_liq_distance_pct <= 0
+            assert any('Min liquidation distance' in warning for warning in risk.warnings)
 
 
 @pytest.mark.asyncio

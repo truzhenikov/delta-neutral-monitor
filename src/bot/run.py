@@ -110,6 +110,8 @@ def render_positions_text(status: dict) -> str:
         for p in account["positions"]:
             liquidation_price = p["liquidation_price"]
             liquidation_text = "None" if liquidation_price is None else format_position_price(liquidation_price)
+            if account["exchange"].split(":", 1)[0] == "qfex" and liquidation_price is not None:
+                liquidation_text += " (calculated)"
             mark_text = format_position_price(p["mark_price"])
             size_text = format_position_size(p["size"])
             lines.append(

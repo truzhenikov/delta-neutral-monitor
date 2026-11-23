@@ -122,6 +122,18 @@ def test_build_daily_snapshots_reply_renders_rows() -> None:
     assert "warnings:" not in text
 
 
+def test_qfex_calculation_note_is_position_description_only() -> None:
+    from src.bot.run import render_positions_text
+
+    position = {"symbol": "PANW-USD", "side": "long", "size": 12,
+                "mark_price": 348.23, "liquidation_price": 266.03}
+    text = render_positions_text({"accounts": [{"exchange": "qfex:main", "positions": [position]}]})
+    assert "liq=266.03 (calculated)" in text
+    position["liquidation_price"] = None
+    text = render_positions_text({"accounts": [{"exchange": "qfex:main", "positions": [position]}]})
+    assert "liq=None" in text and "calculated" not in text
+
+
 def test_render_positions_rounds_prices_above_one_to_two_decimals() -> None:
     from src.bot.run import render_positions_text
 

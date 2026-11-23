@@ -122,8 +122,10 @@ margin guide saying all products are cross-margined; do not silently mix them.
   subtracted from equity: QFEX releases it in the liquidation procedure. A changed
   position, funding payment, fee, transfer, leverage, or another mark changes the
   result. Distance thresholds now use this price, including zero/negative distances
-  for an already-reached/breached boundary. Risk warnings explicitly identify the
-  calculation and fixed-other-input assumptions. A negative root is represented by
+  for an already-reached/breached boundary. The `/positions` description labels
+  QFEX liquidation prices `(calculated)`; provenance alone is not a risk warning
+  and does not raise risk level or send an alert. The fixed-other-input assumptions
+  above still apply. A negative root is represented by
   `None` (no nonnegative crossing in this scenario), not zero or a safety guarantee;
   the existing unavailable-distance warning remains. Maintenance rates >= 1 and
   nonfinite results fail closed. Isolated accounts remain unsupported.
